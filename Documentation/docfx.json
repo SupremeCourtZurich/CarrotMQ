@@ -1,0 +1,68 @@
+{
+  "metadata": [
+    {
+      // Projects for which to build xml documentation
+      "src": [
+        {
+          "src": "./../",
+          "files": [
+            "**/*.csproj"
+          ],
+          "exclude": [
+            "**/*.Test.csproj",
+            // Explucde UnitTest projects,
+            "**/*.Test.*.csproj"
+          ]
+        }
+      ],
+      "dest": "xmlDoc"
+      //Destination folder for XML documentation
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        // Files to iunclude for documentation generation
+        "files": [
+          "**/*.md",
+          // All Markdown files
+          "**/*.yml"
+        ],
+        "exclude": [
+          "_site/**"
+        ]
+      }
+    ],
+    // use internal instance for plantUml diagram generation
+    "markdownEngineProperties": {
+        "plantUml": {
+            "outputFormat": "svg",
+            "remoteUrl": "http://www.plantuml.com/plantuml/",
+            "renderingMode": "remote"
+        }
+    },
+    // include additional files (these will be copied to the _site folder
+    "resource": [
+      {
+        "files": [
+          "**/images/**"
+          // Copy all files from /images/ folders
+        ]
+      }
+    ],
+    "output": "_site",
+    // output folder for the generated static documentation website 
+    "template": [
+      "default",
+      "modern",
+      "template"
+    ],
+    "globalMetadata": {
+        "_appName": "Carrot",
+        "_appTitle": "Carrot",
+        "_appFooter": "Copyright © Supreme Court of the Canton of Zürich",
+        "_enableSearch": true,
+        "pdf": false
+    }
+  }
+}

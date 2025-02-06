@@ -1,0 +1,3 @@
+﻿[*.cs]
+configure_await_analysis_mode = library
+resharper_use_configure_await_false_highlighting = warning
