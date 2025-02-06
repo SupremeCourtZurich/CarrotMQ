@@ -6,7 +6,7 @@ on:
       - main  # Trigger on pull requests to main branch
 
 jobs:
-  build-and-test::
+  build-and-test:
     runs-on: windows-latest
 
     steps:
