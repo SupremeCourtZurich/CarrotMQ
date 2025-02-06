@@ -8,8 +8,8 @@ on:
 
 jobs:
   call-build-and-test:
-    uses: ./.github/workflows/build-and-test.yml
+    uses: .github/workflows/build-and-test.yml
   call-publish-nugets:
-    uses: ./.github/workflows/publish-nugets.yaml
+    uses: .github/workflows/publish-nugets.yml
     needs: call-build-and-test
     secrets: inherit
