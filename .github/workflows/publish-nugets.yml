@@ -1,5 +1,11 @@
 name: Publish nugets
 
+on:
+  workflow_call:
+    secrets:
+      NUGET_API_KEY:
+        required: true
+
 jobs:
   publish-nuget:
     runs-on: windows-latest
