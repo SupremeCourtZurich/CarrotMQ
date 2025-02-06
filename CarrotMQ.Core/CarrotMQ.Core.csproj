@@ -17,6 +17,9 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <DebugType>embedded</DebugType>
 
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageOutputPath>../packages</PackageOutputPath>
+
         <!-- Package validation-->
         <EnablePackageValidation>false</EnablePackageValidation>
         <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
