@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;net8.0;netstandard2.0</TargetFrameworks>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
+
+        <!-- NuGet configurations -->
+        <Description>CarrotMQ.Core contains all the core and base types to create and communicate with a microservice using CarrotMQ.RabbitMQ.</Description>
+        <PackageTags>CarrotMQ, Core, CQRS, Messaging</PackageTags>
+        <PackageReleaseNotes>First alpha release</PackageReleaseNotes>
+        <Company>Supreme Court of Zurich</Company>
+        <Authors>Supreme Court of Zurich</Authors>
+        <Copyright>© Supreme Court of Zurich</Copyright>
+
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DebugType>embedded</DebugType>
+
+        <!-- Package validation-->
+        <EnablePackageValidation>false</EnablePackageValidation>
+        <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
+
+        <!-- MinVer config -->
+        <MinVerTagPrefix>v</MinVerTagPrefix>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="CarrotMQ.Core.Test" />
+        <PackageReference Include="meziantou.analyzer" Version="2.0.186">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.1" />
+        <PackageReference Include="System.Text.Json" Version="9.0.1" />
+
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+        <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
+    </ItemGroup>
+</Project>

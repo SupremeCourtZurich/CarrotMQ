@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+        <TargetFrameworks>net9.0;net8.0;net472</TargetFrameworks>
+        <LangVersion>13.0</LangVersion>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="meziantou.analyzer" Version="2.0.186">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+		<PackageReference Include="MSTest.TestAdapter" Version="3.7.3" />
+		<PackageReference Include="MSTest.TestFramework" Version="3.7.3" />
+		<PackageReference Include="coverlet.collector" Version="6.0.4">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="NSubstitute" Version="5.3.0" />
+		<PackageReference Include="System.Net.Http" Version="4.3.4" />
+        <PackageReference Include="Testcontainers.RabbitMq" Version="4.1.0" />
+    </ItemGroup>
+
+
+	<ItemGroup>
+        <ProjectReference Include="..\CarrotMQ.Core\CarrotMQ.Core.csproj" />
+        <ProjectReference Include="..\CarrotMQ.RabbitMQ\CarrotMQ.RabbitMQ.csproj" />
+		<ProjectReference Include="..\CarrotMQ.RabbitMQ.Test\CarrotMQ.RabbitMQ.Test.csproj" />
+
+	</ItemGroup>
+
+</Project>
