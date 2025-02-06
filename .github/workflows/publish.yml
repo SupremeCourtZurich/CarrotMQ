@@ -1,4 +1,4 @@
-name: publish carrotmq-rabbitmq
+name: Publish
 
 on:
   release:

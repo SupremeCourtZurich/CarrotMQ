@@ -1,10 +1,4 @@
-name: publish-nugets
-
-on:
-  workflow_call:
-    secrets:
-      NUGET_API_KEY:
-        required: true
+name: Publish nugets
 
 jobs:
   publish-nuget:
