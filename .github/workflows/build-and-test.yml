@@ -57,5 +57,15 @@ jobs:
         name: build-artifacts-net8
         path: ./publish/net8
 
+    - name: Setup .NET 8
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Setup .NET 9
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
     - name: Run all tests
       run: dotnet test ./publish/**/CarrotMQ*Test*.dll --verbosity normal
