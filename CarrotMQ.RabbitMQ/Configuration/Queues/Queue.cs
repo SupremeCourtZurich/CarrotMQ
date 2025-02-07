@@ -17,9 +17,11 @@ public class Queue
     /// <summary>
     /// Uses a consumer for this queue
     /// </summary>
-    public Queue WithConsumer(Action<ConsumerBuilder>? consumerConfiguration = null)
+    public Queue WithConsumer(Action<ConsumerBuilder>? configureConsumer = null)
     {
-        consumerConfiguration?.Invoke(new ConsumerBuilder(QueueConfiguration));
+        var consumerBuilder = new ConsumerBuilder(QueueConfiguration);
+
+        configureConsumer?.Invoke(consumerBuilder);
 
         return this;
     }
@@ -36,9 +38,11 @@ public class Queue<TQueue> : Queue
     /// <summary>
     /// Uses a consumer for this queue
     /// </summary>
-    public new TQueue WithConsumer(Action<ConsumerBuilder>? consumerConfiguration = null)
+    public new TQueue WithConsumer(Action<ConsumerBuilder>? configureConsumer = null)
     {
-        consumerConfiguration?.Invoke(new ConsumerBuilder(QueueConfiguration));
+        var consumerBuilder = new ConsumerBuilder(QueueConfiguration);
+
+        configureConsumer?.Invoke(consumerBuilder);
 
         return (TQueue)this;
     }

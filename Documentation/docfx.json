@@ -58,9 +58,9 @@
       "template"
     ],
     "globalMetadata": {
-        "_appName": "Carrot",
-        "_appTitle": "Carrot",
-        "_appFooter": "Copyright © Supreme Court of the Canton of Zürich",
+        "_appName": "CarrotMQ",
+        "_appTitle": "CarrotMQ",
+        "_appFooter": "Copyright © Supreme Court of the Canton of Zurich",
         "_enableSearch": true,
         "pdf": false
     }
