@@ -13,6 +13,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.gitignore = .gitignore
 		CarrotMQ.sln.DotSettings = CarrotMQ.sln.DotSettings
 		nuget.config = nuget.config
+		README.md = README.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CarrotMQ.RabbitMQ.Test.Integration", "CarrotMQ.RabbitMQ.Test.Integration\CarrotMQ.RabbitMQ.Test.Integration.csproj", "{64695A91-97D9-43DC-91E8-64E44280F9BC}"
@@ -26,7 +27,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Pipelines", "Pipelines", "{AED62390-944B-49DF-9634-0CB2186053D9}"
 	ProjectSection(SolutionItems) = preProject
 		.github\workflows\build-and-test.yml = .github\workflows\build-and-test.yml
+		main.yml = main.yml
 		.github\workflows\publish-nugets.yml = .github\workflows\publish-nugets.yml
+		public-docfx-documentation.yml = public-docfx-documentation.yml
 		.github\workflows\publish.yml = .github\workflows\publish.yml
 	EndProjectSection
 EndProject

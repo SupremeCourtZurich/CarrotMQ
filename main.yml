@@ -1,0 +1,10 @@
+name: CarrotMQ
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  call-build-and-test:
+    uses: ./.github/workflows/build-and-test.yml
