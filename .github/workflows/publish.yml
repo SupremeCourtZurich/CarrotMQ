@@ -1,0 +1,15 @@
+name: Publish
+
+on:
+  release:
+    types:
+      # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#release
+      - published
+
+jobs:
+  call-build-and-test:
+    uses: ./.github/workflows/build-and-test.yml
+  call-publish-nugets:
+    uses: ./.github/workflows/publish-nugets.yml
+    needs: call-build-and-test
+    secrets: inherit
