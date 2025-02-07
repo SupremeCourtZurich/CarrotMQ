@@ -29,9 +29,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        dotnet-version: [ '8.0.x', '9.0.x' ]
     needs: build
 
     steps:
@@ -40,10 +37,12 @@ jobs:
       with:
         name: build-artifacts-net
 
-    - name: Setup dotnet ${{ matrix.dotnet-version }}
+    - name: Setup dotnet
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
+        dotnet-version: | 
+         8.0.x
+         9.0.x
 
     - name: Run all tests
       run: dotnet test ./**/CarrotMQ*Test*.dll --verbosity normal
