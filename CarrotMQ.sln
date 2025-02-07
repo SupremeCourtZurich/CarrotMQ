@@ -27,9 +27,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Pipelines", "Pipelines", "{AED62390-944B-49DF-9634-0CB2186053D9}"
 	ProjectSection(SolutionItems) = preProject
 		.github\workflows\build-and-test.yml = .github\workflows\build-and-test.yml
-		main.yml = main.yml
+		.github\workflows\main.yml = .github\workflows\main.yml
+		.github\workflows\public-docfx-documentation.yml = .github\workflows\public-docfx-documentation.yml
 		.github\workflows\publish-nugets.yml = .github\workflows\publish-nugets.yml
-		public-docfx-documentation.yml = public-docfx-documentation.yml
 		.github\workflows\publish.yml = .github\workflows\publish.yml
 	EndProjectSection
 EndProject
