@@ -8,11 +8,12 @@
           "files": [
             "**/*.csproj"
           ],
-          "exclude": [
-            "**/*.Test.csproj",
-            // Explucde UnitTest projects,
-            "**/*.Test.*.csproj"
-          ]
+            "exclude": [
+                "**/*.Test.csproj",
+                // Explucde UnitTest projects,
+                "**/*.Test.*.csproj",
+                "Documentation/Documentation.csproj"
+            ]
         }
       ],
       "dest": "xmlDoc"

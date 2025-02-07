@@ -1,5 +1,7 @@
 ## CarrotMQ
 
+[![CarrotMQ](https://github.com/SupremeCourtZurich/CarrotMQ/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/SupremeCourtZurich/CarrotMQ/actions/workflows/main.yml)
+
 CarrotMQ is a powerful and versatile .NET library designed to streamline the development of microservices within a RabbitMQ-based architecture. It empowers developers to create efficient and robust microservices with ease, enabling you to define and communicate Events, Commands, and Queries using simple .NET classes.
 
 ### Components
