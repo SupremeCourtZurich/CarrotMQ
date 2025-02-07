@@ -9,8 +9,8 @@
             "**/*.csproj"
           ],
             "exclude": [
+                // Exclude UnitTest and Documentation projects,
                 "**/*.Test.csproj",
-                // Explucde UnitTest projects,
                 "**/*.Test.*.csproj",
                 "Documentation/Documentation.csproj"
             ]
