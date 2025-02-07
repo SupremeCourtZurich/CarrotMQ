@@ -19,44 +19,24 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
 
-    - name: Publish .NET 9 artifacts
-      run: dotnet publish -c Release -f net9.0 -o ./publish/net9
-      continue-on-error: true
 
-    - name: Publish .NET 8 artifacts
-      run: dotnet publish -c Release -f net8.0 -o ./publish/net8
-      continue-on-error: true
-
-    - name: Upload .NET 9 artifacts
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: build-artifacts-net9
-        path: ./publish/net9
-
-    - name: Upload .NET 8 artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-artifacts-net8
-        path: ./publish/net8
+        name: build-artifacts-net
+        path: |
+            ./CarrotMQ.*/bin/Release/
+            !./CarrotMQ.*/bin/Release/net472
 
   test:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-    - uses: actions/checkout@v3
-
-    - name: Download .NET 9 artifacts
+    - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
-        name: build-artifacts-net9
-        path: ./publish/net9
-
-    - name: Download .NET 8 artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-artifacts-net8
-        path: ./publish/net8
+        name: build-artifacts-net
 
     - name: Setup .NET 8
       uses: actions/setup-dotnet@v3
@@ -69,4 +49,4 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Run all tests
-      run: dotnet test ./publish/**/CarrotMQ*Test*.dll --verbosity normal
+      run: dotnet test ./**/CarrotMQ*Test*.dll --verbosity normal
