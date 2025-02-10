@@ -6,7 +6,7 @@ using CarrotMQ.Core.Handlers.HandlerResults;
 using CarrotMQ.Core.MessageProcessing.Middleware;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
-using CarrotMQ.Core.Tracing;
+using CarrotMQ.Core.Telemetry;
 using Microsoft.Extensions.Logging;
 
 namespace CarrotMQ.Core.MessageProcessing;

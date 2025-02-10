@@ -1,7 +1,7 @@
 ﻿using System;
 using CarrotMQ.Core.MessageProcessing.Delivery;
 
-namespace CarrotMQ.Core.Tracing;
+namespace CarrotMQ.Core.Telemetry;
 
 /// <summary>
 /// Interface for recording metrics related to CarrotMQ processing, such as request duration and message delivery status.

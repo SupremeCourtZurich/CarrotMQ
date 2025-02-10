@@ -3,17 +3,13 @@ using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.Protocol;
 using Microsoft.Extensions.Options;
 
-namespace CarrotMQ.Core.Tracing;
+namespace CarrotMQ.Core.Telemetry;
 
 /// <summary>
 /// Factory for creating <see cref="Activity" /> for CarrotMQ tracing
 /// </summary>
 public static class CarrotActivityFactory
 {
-    /// <summary>
-    /// Name of the ActivitySource object used for tracing with CarrotMQ.RabbitMQ
-    /// </summary>
-    public const string TracingActivitySourceName = "CarrotMQ.RabbitMQ";
     /// <summary>
     /// Key for remote service name in the activity tags.
     /// </summary>
@@ -32,7 +28,7 @@ public static class CarrotActivityFactory
     /// <summary>
     /// The <see cref="System.Diagnostics.ActivitySource" /> used for CarrotMQ tracing.
     /// </summary>
-    private static readonly ActivitySource ActivitySource = new(TracingActivitySourceName);
+    private static readonly ActivitySource ActivitySource = new(Names.CarrotActivitySourceName);
 
     /// <summary>
     /// Creates a new Consumer tracing activity.

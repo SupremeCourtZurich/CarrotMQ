@@ -5,7 +5,7 @@ using CarrotMQ.Core;
 using CarrotMQ.Core.Common;
 using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.MessageProcessing;
-using CarrotMQ.Core.Tracing;
+using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration.Exchanges;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
 using CarrotMQ.RabbitMQ.Serialization;

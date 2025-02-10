@@ -7,6 +7,8 @@ namespace CarrotMQ.Core.MessageProcessing;
 /// </summary>
 public static class CalledMethodResolver
 {
+    private const string ResponsePrefix = "Response:";
+
     /// <summary>
     /// Builds a called method handler key based on the type of the message
     /// </summary>
@@ -24,7 +26,7 @@ public static class CalledMethodResolver
     /// <returns>The response key built from the specified request key.</returns>
     public static string BuildResponseCalledMethodKey(string requestKey)
     {
-        return $"Response:{requestKey}";
+        return $"{ResponsePrefix}{requestKey}";
     }
 
     /// <summary>

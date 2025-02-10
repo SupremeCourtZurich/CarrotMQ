@@ -6,18 +6,13 @@ using CarrotMQ.Core.MessageProcessing.Delivery;
 using System.Diagnostics;
 #endif
 
-namespace CarrotMQ.Core.Tracing;
+namespace CarrotMQ.Core.Telemetry;
 
 /// <summary>
 /// Class for recording metrics related to CarrotMQ processing, such as request duration and message delivery status.
 /// </summary>
 internal sealed class CarrotMetricsRecorder : ICarrotMetricsRecorder
 {
-    /// <summary>
-    /// Constant representing the name of the meter used for CarrotMQ metrics.
-    /// </summary>
-    public const string MeterName = "CarrotMQ.RabbitMQ.CarrotMeter";
-
     /// <summary>
     /// Counter to track the number of active requests.
     /// </summary>
@@ -54,13 +49,13 @@ internal sealed class CarrotMetricsRecorder : ICarrotMetricsRecorder
     /// <param name="meterFactory">Factory for creating meters.</param>
     public CarrotMetricsRecorder(IMeterFactory meterFactory)
     {
-        _meter = meterFactory.Create(MeterName);
+        _meter = meterFactory.Create(Names.CarrotMeterName);
 
-        _requestDurationHistogram = _meter.CreateHistogram<double>("carrotmq-rabbitmq-request-duration-ms");
-        _activeRequestsCounter = _meter.CreateUpDownCounter<long>("carrotmq-rabbitmq-active-requests-counter");
-        _requestsCounter = _meter.CreateCounter<long>("carrotmq-rabbitmq-request-counter");
-        _responseStatusCounter = _meter.CreateCounter<long>("carrotmq-rabbitmq-response-counter");
-        _messageDeliveryCounter = _meter.CreateCounter<long>("carrotmq-rabbitmq-message-delivery-counter");
+        _requestDurationHistogram = _meter.CreateHistogram<double>("carrotmq-request-duration-ms");
+        _activeRequestsCounter = _meter.CreateUpDownCounter<long>("carrotmq-active-requests-counter");
+        _requestsCounter = _meter.CreateCounter<long>("carrotmq-request-counter");
+        _responseStatusCounter = _meter.CreateCounter<long>("carrotmq-response-counter");
+        _messageDeliveryCounter = _meter.CreateCounter<long>("carrotmq-message-delivery-counter");
     }
 
     /// <inheritdoc />
