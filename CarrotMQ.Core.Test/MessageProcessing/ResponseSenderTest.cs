@@ -3,8 +3,8 @@ using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.MessageProcessing.Middleware;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
+using CarrotMQ.Core.Telemetry;
 using CarrotMQ.Core.Test.Helper;
-using CarrotMQ.Core.Tracing;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 

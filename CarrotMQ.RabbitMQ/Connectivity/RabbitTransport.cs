@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.Protocol;
-using CarrotMQ.Core.Tracing;
+using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
