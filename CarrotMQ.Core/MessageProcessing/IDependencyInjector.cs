@@ -44,12 +44,6 @@ public interface IDependencyInjector : IAsyncDisposable
     ICarrotSerializer GetCarrotSerializer();
 
     /// <summary>
-    /// Gets the <see cref="ITransport" /> that is used to send a response to a CarrotMQ message handled by
-    /// <see cref="RequestHandlerBase{TRequest,TResponse}" />.
-    /// </summary>
-    ITransport GetTransport();
-
-    /// <summary>
     /// Gets the <see cref="IMiddlewareProcessor" />.
     /// </summary>
     IMiddlewareProcessor GetMiddlewareProcessor();

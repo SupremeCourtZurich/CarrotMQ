@@ -38,7 +38,6 @@ public class CarrotMiddlewareTest
         dependencyInjector.CreateAsyncScope().Returns(dependencyInjector);
         dependencyInjector.GetCarrotSerializer().Returns(_carrotSerializer);
         dependencyInjector.GetMiddlewareProcessor().Returns(middlewareProcessor);
-        dependencyInjector.GetTransport().Returns(Substitute.For<ITransport>());
 
         var handlerCollection = new HandlerCollection(new ServiceCollection(), new BindingCollection());
         _messageDistributor = new MessageDistributor(

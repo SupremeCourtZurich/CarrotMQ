@@ -67,12 +67,6 @@ internal sealed class DependencyInjector : IDependencyInjector
     }
 
     /// <inheritdoc />
-    public ITransport GetTransport()
-    {
-        return _serviceProvider.GetRequiredService<ITransport>();
-    }
-
-    /// <inheritdoc />
     public IMiddlewareProcessor GetMiddlewareProcessor()
     {
         return _serviceProvider.GetRequiredService<IMiddlewareProcessor>();
