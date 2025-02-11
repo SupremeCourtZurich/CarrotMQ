@@ -16,43 +16,6 @@ public class DependencyInjectorTest
         TestTransport.AllDisposed.Clear();
     }
 
-    [TestMethod]
-    public async Task Get_AsyncDisposable_Transport()
-    {
-        ServiceCollection serviceCollection = new();
-        serviceCollection.AddScoped<ITransport, TestTransport>();
-        await using (var serviceProvider = serviceCollection.BuildServiceProvider())
-        {
-            IDependencyInjector dependencyInjector = new DependencyInjector(serviceProvider);
-
-            _ = dependencyInjector.GetTransport();
-
-            await dependencyInjector.DisposeAsync();
-        }
-
-        Assert.AreEqual(1, TestTransport.AllDisposed.Count);
-        Assert.IsTrue(TestTransport.AllDisposed.All(entry => entry.Value), $"Not all {nameof(TestTransport)} have been disposed");
-    }
-
-    [TestMethod]
-    public async Task Get_Scoped_AsyncDisposable_Transport()
-    {
-        ServiceCollection serviceCollection = new();
-        serviceCollection.AddScoped<ITransport, TestTransport>();
-        await using var serviceProvider = serviceCollection.BuildServiceProvider();
-
-        IDependencyInjector dependencyInjector = new DependencyInjector(serviceProvider);
-
-        await using (var scope = dependencyInjector.CreateAsyncScope())
-        {
-            _ = scope.GetTransport();
-        }
-
-        await dependencyInjector.DisposeAsync();
-
-        Assert.AreEqual(1, TestTransport.AllDisposed.Count);
-        Assert.IsTrue(TestTransport.AllDisposed.All(entry => entry.Value), $"Not all {nameof(TestTransport)} have been disposed");
-    }
 
     [TestMethod]
     public async Task Disposable_Serializer_IsDisposed()

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 namespace CarrotMQ.Core.MessageProcessing;
 
 /// <inheritdoc />
-internal sealed class ResponseSender : IResponseSender
+public sealed class ResponseSender : IResponseSender
 {
     private readonly ILogger<ResponseSender> _logger;
     private readonly ICarrotMetricsRecorder _metricsRecorder;
