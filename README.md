@@ -6,17 +6,18 @@ CarrotMQ is a .NET library simplifying microservice development with RabbitMQ. I
 
 ### Features
 
-- Supports all .NET versions
 - Simplifies the development of microservices with RabbitMQ.
+- Fully integrated with .NET dependency injection.
 - Implements CQRS (Command Query Responsibility Segregation) enabling the clear separation of read and write operations.
-- Define your commands, queries and events using simple .NET classes
-- Fully async
-
+- Define your commands, queries, events and their respective handlers using simple .NET classes.
+- Async support.
+- Uses [RabbitMQ.Client](https://github.com/rabbitmq/rabbitmq-dotnet-client) for RabbitMQ integration.
+- Supports all .NET versions
 
 ### Components
 
-- **CarrotMQ.Core**: is a transport-agnostic library that defines the essential interfaces and base classes required for creating and handling messages using CarrotMQ.RabbitMQ.
-- **CarrotMQ.RabbitMQ**: Provides the implementation for RabbitMQ, allowing you to integrate RabbitMQ messaging into your microservices.
+- **CarrotMQ.Core** is a transport-agnostic library that defines the essential interfaces and base classes required for creating and handling messages using CarrotMQ.RabbitMQ.
+- **CarrotMQ.RabbitMQ** provides the implementation for RabbitMQ, allowing you to integrate RabbitMQ messaging into your microservices.
 
 
 ## Documentation
@@ -34,7 +35,7 @@ The nuget packages are available on nuget.org :
 
 ## About this project
 
-CarrotMQ, initially developed in 2017 to support .NET Framework 4.7.2 microservices, has been significantly refactored and reimplemented.  The project began under a different name, with the original concept and first version created by [JonLeDon](https://github.com/JonLeDon).  This initial version is still actively used in several internal applications and services at the Supreme Court of the Canton of Zürich (Switzerland).
+CarrotMQ, initially developed in 2017 to support .NET Framework 4.7.2 microservices, has been significantly refactored and reimplemented. The project began under a different name, with the original concept and first version created by [JonLeDon](https://github.com/JonLeDon).  This initial version is still actively used in several internal applications and services at the Supreme Court of the Canton of Zürich (Switzerland).
 
 Driven by the emergence of .NET Core and the improved asynchronous capabilities of the RabbitMQ.Client NuGet package, we undertook a substantial rewrite of CarrotMQ.
 
