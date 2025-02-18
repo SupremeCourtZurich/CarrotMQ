@@ -7,8 +7,8 @@
 
         <!-- NuGet configurations -->
         <Description>
-			CarrotMQ.RabbitMQ is a powerful and versatile .NET library designed to streamline the development of microservices within a RabbitMQ-based architecture. It empowers developers to create efficient and robust microservices with ease, enabling you to define and communicate Events, Commands, and Queries using simple .NET classes.
-		</Description>
+            A .NET library simplifying microservice development with RabbitMQ. Send and consume events, commands, and queries using simple .NET classes.
+        </Description>
 		<PackageTags>CarrotMQ, RabbitMQ, CQRS, AMQP, Messaging</PackageTags>
 		<PackageReleaseNotes>First alpha release</PackageReleaseNotes>
 		<Company>Supreme Court of Zurich</Company>
