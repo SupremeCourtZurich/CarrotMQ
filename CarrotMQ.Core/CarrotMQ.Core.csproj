@@ -33,15 +33,24 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <InternalsVisibleTo Include="CarrotMQ.Core.Test" />
         <PackageReference Include="meziantou.analyzer" Version="2.0.186">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.1" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="MinVer" Version="6.0.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="System.Text.Json" Version="9.0.1" />
-
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
-        <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
     </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="CarrotMQ.Core.Test" />
+    </ItemGroup>
+
 </Project>
