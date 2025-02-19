@@ -15,4 +15,18 @@ public sealed class ReceivedMessages
     {
         return await _messageChannel.Reader.ReadAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    public async ValueTask<int[]> ReadAllAsync(int count, CancellationToken cancellationToken)
+    {
+        var allItems = new int[count];
+
+        for (var i = 0; i < count; i++)
+        {
+            allItems[i] = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return allItems;
+    }
+
+
 }

@@ -49,4 +49,27 @@ public class ExchangeEndPointEventTest : TestBaseNoReply
 
         await VerifyDoRetry(id);
     }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public async Task ExchangeEndPoint_Event_Load_OK()
+    {
+        const int startId = 2110;
+        const int eventCount = 20;
+        Guid barrierId = Guid.NewGuid();
+        var barrier = new AsyncBarrier(eventCount + 1);
+        BarrierBag.Barriers.Add(barrierId, barrier);
+
+        for (int i = startId; i < startId + eventCount; i++)
+        {
+            await CarrotClient.PublishAsync(new ExchangeEndPointEvent(i)
+            {
+                BarrierId = barrierId
+            });
+        }
+
+        await barrier.SignalAndWaitAsync();
+
+        await VerifyOk(startId, eventCount);
+    }
 }

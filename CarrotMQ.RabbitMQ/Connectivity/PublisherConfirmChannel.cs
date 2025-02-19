@@ -56,7 +56,7 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override CreateChannelOptions CreateChannelOptions()
     {
-        return new CreateChannelOptions(true, false);
+        return new CreateChannelOptions(true, false, consumerDispatchConcurrency:null);
     }
 
     /// <summary>

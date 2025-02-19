@@ -24,4 +24,6 @@ public class ExchangeEndPointEvent : DtoBase, IEvent<ExchangeEndPointEvent, Test
     public bool BadRequest { get; set; }
 
     public bool DoReject { get; set; }
+
+    public Guid? BarrierId { get; set; }
 }

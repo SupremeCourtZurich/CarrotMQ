@@ -225,7 +225,7 @@ internal class CarrotChannel : ICarrotChannel
 
     protected virtual CreateChannelOptions CreateChannelOptions()
     {
-        return new CreateChannelOptions(false, false);
+        return new CreateChannelOptions(false, false, consumerDispatchConcurrency: null);
     }
 
     private Task ChannelOnCallbackExceptionAsync(object sender, CallbackExceptionEventArgs e)
