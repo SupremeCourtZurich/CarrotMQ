@@ -1,55 +1,62 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-	<PropertyGroup>
-		<TargetFrameworks>net9.0;net8.0;netstandard2.0</TargetFrameworks>
-		<LangVersion>13.0</LangVersion>
-		<Nullable>enable</Nullable>
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;net8.0;netstandard2.0</TargetFrameworks>
+        <LangVersion>13.0</LangVersion>
+        <Nullable>enable</Nullable>
 
         <!-- NuGet configurations -->
         <Description>
             A .NET library simplifying microservice development with RabbitMQ. Send and consume events, commands, and queries using simple .NET classes.
         </Description>
-		<PackageTags>CarrotMQ, RabbitMQ, CQRS, AMQP, Messaging</PackageTags>
-		<PackageReleaseNotes>First alpha release</PackageReleaseNotes>
-		<Company>Supreme Court of Zurich</Company>
-		<Authors>Supreme Court of Zurich</Authors>
-		<Copyright>© Supreme Court of Zurich</Copyright>
-		<PublishRepositoryUrl>true</PublishRepositoryUrl>
-		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<DebugType>embedded</DebugType>
+        <PackageTags>CarrotMQ, RabbitMQ, CQRS, AMQP, Messaging</PackageTags>
+        <PackageReleaseNotes>First alpha release</PackageReleaseNotes>
+        <Company>Supreme Court of Zurich</Company>
+        <Authors>Supreme Court of Zurich</Authors>
+        <Copyright>© Supreme Court of Zurich</Copyright>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <DebugType>embedded</DebugType>
 
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageOutputPath>../packages</PackageOutputPath>
 
-
         <!-- Package validation-->
         <EnablePackageValidation>false</EnablePackageValidation>
-		<PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
+        <PackageValidationBaselineVersion>1.0.0</PackageValidationBaselineVersion>
 
         <!-- MinVer config -->
         <MinVerTagPrefix>v</MinVerTagPrefix>
-	</PropertyGroup>
+    </PropertyGroup>
 
     <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
-	<ItemGroup>
-		<InternalsVisibleTo Include="CarrotMQ.RabbitMQ.Test" />
-		<InternalsVisibleTo Include="CarrotMQ.RabbitMQ.Test.Integration" />
-		<PackageReference Include="meziantou.analyzer" Version="2.0.186">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.1" />
-		<PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
+    <ItemGroup>
+        <PackageReference Include="meziantou.analyzer" Version="2.0.186">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.1" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="MinVer" Version="6.0.0">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
+    </ItemGroup>
 
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
-        <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="All" />
-	</ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="CarrotMQ.RabbitMQ.Test" />
+        <InternalsVisibleTo Include="CarrotMQ.RabbitMQ.Test.Integration" />
+    </ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\CarrotMQ.Core\CarrotMQ.Core.csproj" />
-	</ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\CarrotMQ.Core\CarrotMQ.Core.csproj" />
+    </ItemGroup>
 
 </Project>
