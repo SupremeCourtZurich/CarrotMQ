@@ -1,4 +1,4 @@
-﻿using CarrotMQ.Core.Tracing;
+﻿using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration;
 using Dto;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +16,7 @@ internal class Program
     public static Guid CustomRoutingKey = Guid.NewGuid();
     private static async Task Main(string[] args)
     {
-        var appBuilder = new HostApplicationBuilder();
+        var appBuilder = new HostApplicationBuilder(args);
 
         appBuilder.Services.AddCarrotMqRabbitMq(
             builder =>
@@ -50,7 +50,7 @@ internal class Program
                     metricsBuilder.AddMeter("CarrotMQ.RabbitMQ.CarrotMeter");
                     metricsBuilder.AddRuntimeInstrumentation();
                 })
-            .WithTracing(tracingBuilder => { tracingBuilder.AddSource(CarrotActivityFactory.TracingActivitySourceName); })
+            .WithTracing(tracingBuilder => { tracingBuilder.AddSource(Names.CarrotActivitySourceName); })
             .ConfigureResource(resource => resource.AddService("Client1"))
             .UseOtlpExporter();
 

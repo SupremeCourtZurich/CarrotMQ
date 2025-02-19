@@ -1,4 +1,4 @@
-﻿using CarrotMQ.Core.Tracing;
+﻿using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration;
 using CarrotMQ.RabbitMQ.Configuration.Exchanges;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
@@ -48,11 +48,7 @@ internal class Program
                     metricsBuilder.AddMeter("CarrotMQ.RabbitMQ.CarrotMeter");
                     metricsBuilder.AddRuntimeInstrumentation();
                 })
-            .WithTracing(
-                tracingBuilder =>
-                {
-                    tracingBuilder.AddSource(CarrotActivityFactory.TracingActivitySourceName);
-                })
+            .WithTracing(tracingBuilder => { tracingBuilder.AddSource(Names.CarrotActivitySourceName); })
             .ConfigureResource(resource => resource.AddService("Service2"))
             .UseOtlpExporter();
 
