@@ -12,6 +12,19 @@ public class TestBaseNoReply : TestBase
     }
 
     /// <summary>
+    /// - request are all received and handled
+    /// </summary>
+    protected async Task VerifyOk(int startId, int count)
+    {
+        var receivedId = await ReceivedMessages.ReadAllAsync(count, Cts.Token).ConfigureAwait(false);
+
+        for (int i = startId; i < startId + count; i++)
+        {
+            Assert.IsTrue(receivedId.Contains(i), $"{i} was not found in [{string.Join(",", receivedId)}]");
+        }
+    }
+
+    /// <summary>
     /// - request is received and throws an exception
     /// - message is placed in dead letter queue
     /// </summary>
