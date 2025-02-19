@@ -55,9 +55,9 @@ public class ExchangeEndPointEventTest : TestBaseNoReply
     public async Task ExchangeEndPoint_Event_Load_OK()
     {
         const int startId = 2110;
-        const int eventCount = 10;
+        const int eventCount = 20;
         Guid barrierId = Guid.NewGuid();
-        var barrier = new Barrier(eventCount + 1);
+        var barrier = new AsyncBarrier(eventCount + 1);
         BarrierBag.Barriers.Add(barrierId, barrier);
 
         for (int i = startId; i < startId + eventCount; i++)
@@ -68,7 +68,7 @@ public class ExchangeEndPointEventTest : TestBaseNoReply
             });
         }
 
-        barrier.SignalAndWait();
+        await barrier.SignalAndWaitAsync();
 
         await VerifyOk(startId, eventCount);
     }

@@ -2,5 +2,5 @@
 
 public sealed class BarrierBag
 {
-    public IDictionary<Guid, Barrier> Barriers = new Dictionary<Guid, Barrier>();
+    public IDictionary<Guid, AsyncBarrier> Barriers = new Dictionary<Guid, AsyncBarrier>();
 }

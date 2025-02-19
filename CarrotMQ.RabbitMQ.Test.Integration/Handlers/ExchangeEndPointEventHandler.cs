@@ -23,11 +23,11 @@ public sealed class ExchangeEndPointEventHandler : EventHandlerBase<ExchangeEndP
     {
         if (@event.BarrierId is not null)
         {
-            if (_barrierBag.Barriers.TryGetValue(@event.BarrierId.Value, out Barrier? value))
+            if (_barrierBag.Barriers.TryGetValue(@event.BarrierId.Value, out AsyncBarrier? value))
             {
                 Console.WriteLine($"Received:{@event.Id} and waiting");
 
-                value.SignalAndWait(cancellationToken);
+                await value.SignalAndWaitAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
