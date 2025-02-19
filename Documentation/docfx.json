@@ -6,7 +6,8 @@
         {
           "src": "./../",
           "files": [
-            "**/*.csproj"
+            "CarrotMQ.Core/*.csproj",
+            "CarrotMQ.RabbitMQ/*.csproj"
           ],
             "exclude": [
                 // Exclude UnitTest and Documentation projects,

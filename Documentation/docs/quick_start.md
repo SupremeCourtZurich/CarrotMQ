@@ -33,17 +33,19 @@ Microservice -down-> "CarrotMQ<U+002E>RabbitMQ"
 ```
 
 ### Dto Project
-For the Dto project, create a .NET 9 Library project. Inside this project, we will define the endpoints and events.
+For the Dto project, create a .NET 9 Class Library project. Inside this project, we will define the endpoints and events.
 
 This project should reference the **CarrotMQ.Core** nuget package.
 
 #### Defining endpoints
 
-[!code-csharp[](../CodeExamples/QuickStart_CodeSample.cs#EndPointDefinitions)]
+[!code-csharp[](../../Examples/QuickStart/Dto/MyExchange.cs#MyExchangeDefinition)]
+
+[!code-csharp[](../../Examples/QuickStart/Dto/MyQueue.cs#MyQueueDefinition)]
 
 #### Defining an event
 
-[!code-csharp[](../CodeExamples/QuickStart_CodeSample.cs#EventDefinition)]
+[!code-csharp[](../../Examples/QuickStart/Dto/MyEvent.cs#MyEventDefinition)]
 
 ### Microservice Project
 
@@ -55,13 +57,13 @@ This project should reference the **CarrotMQ.RabbitMQ** nuget package and the **
 
 Inside the microservice project, create the handler class that will handle your event.
 
-[!code-csharp[](../CodeExamples/QuickStart_CodeSample.cs#HandlerDefinition)]
+[!code-csharp[](../../Examples/QuickStart/Service/MyEventHandler.cs#MyEventHandlerDefinition)]
 
 #### Bootstrapping the service
 
 In the Program.cs of your microservice project, configure CarrotMQ for RabbitMQ.
 
-[!code-csharp[](../CodeExamples/QuickStart_CodeSample.cs#BootstrappingService)]
+[!code-csharp[](../../Examples/QuickStart/Service/Program.cs#BootstrappingService)]
 
 ### Client Project
 
@@ -71,6 +73,5 @@ This project should also reference the **CarrotMQ.RabbitMQ** nuget package and t
 
 The configuration is similar to the microservice project without creating exchanges, queues, and registering consumers:
 
-[!code-csharp[](../CodeExamples/QuickStart_CodeSample_Client.cs#BootstrappingClient)]
-
+[!code-csharp[](../../Examples/QuickStart/Client/Program.cs#BootstrappingClient)]
 Here we directly get the ICarrotClient out of the ServiceCollection, in a real application you can let the DI inject the ICarrotClient interface in your services.
