@@ -7,11 +7,13 @@ namespace CarrotMQ.RabbitMQ.Test.Integration.Handlers;
 // ReSharper disable once ClassNeverInstantiated.Global
 public sealed class ExchangeEndPointEventHandler : EventHandlerBase<ExchangeEndPointEvent>
 {
+    private readonly BarrierBag _barrierBag;
     private readonly ReceivedMessages _receivedMessages;
 
-    public ExchangeEndPointEventHandler(ReceivedMessages receivedMessages)
+    public ExchangeEndPointEventHandler(ReceivedMessages receivedMessages, BarrierBag barrierBag)
     {
         _receivedMessages = receivedMessages;
+        _barrierBag = barrierBag;
     }
 
     public override async Task<IHandlerResult> HandleAsync(
@@ -19,7 +21,18 @@ public sealed class ExchangeEndPointEventHandler : EventHandlerBase<ExchangeEndP
         ConsumerContext consumerContext,
         CancellationToken cancellationToken)
     {
+        if (@event.BarrierId is not null)
+        {
+            if (_barrierBag.Barriers.TryGetValue(@event.BarrierId.Value, out Barrier? value))
+            {
+                Console.WriteLine($"Received:{@event.Id} and waiting");
+
+                value.SignalAndWait(cancellationToken);
+            }
+        }
+
         await _receivedMessages.WriteAsync(@event.Id, cancellationToken).ConfigureAwait(false);
+        Console.WriteLine($"Received:{@event.Id}");
 
         if (@event.TaskWaitDuration > TimeSpan.Zero)
         {
@@ -27,7 +40,7 @@ public sealed class ExchangeEndPointEventHandler : EventHandlerBase<ExchangeEndP
             {
                 for (var i = 0; i < @event.WaitDurationCount; i++)
                 {
-                    Console.WriteLine($"Task delay {i} {@event.TaskWaitDuration.Milliseconds}ms");
+                    Console.WriteLine($"Task delay {i} {@event.TaskWaitDuration.TotalMilliseconds}ms");
                     await Task.Delay(@event.TaskWaitDuration, cancellationToken).ConfigureAwait(false);
                 }
             }

@@ -20,6 +20,7 @@ public class TestBase
     internal static ReceivedMessages ReceivedMessages = null!;
     internal static ReceivedResponses ReceivedResponses = null!;
     internal static DeadLetterConsumer DeadLetterConsumer = null!;
+    internal static BarrierBag BarrierBag = null!;
 
     private static RabbitMqContainer s_rabbitContainer = null!;
 
@@ -68,6 +69,7 @@ public class TestBase
         ReceivedMessages = ConsumerHost.Host.Services.GetRequiredService<ReceivedMessages>();
         ReceivedResponses = ConsumerHost.Host.Services.GetRequiredService<ReceivedResponses>();
         DeadLetterConsumer = ConsumerHost.Host.Services.GetRequiredService<DeadLetterConsumer>();
+        BarrierBag = ConsumerHost.Host.Services.GetRequiredService<BarrierBag>();
         await ConsumerHost.WaitForConsumerHostBootstrapToCompleteAsync().ConfigureAwait(false);
         await DeadLetterConsumer.InitializeAsync(DeadLetterQueue, DeadLetterExchange).ConfigureAwait(false);
     }
@@ -80,7 +82,7 @@ public class TestBase
         await RabbitApi.DeleteVHostAsync().ConfigureAwait(false);
         RabbitApi.Dispose();
 
-        await s_rabbitContainer.DisposeAsync();
+        await s_rabbitContainer.DisposeAsync().ConfigureAwait(false);
     }
 
     [TestInitialize]
@@ -119,6 +121,7 @@ public class TestBase
                     {
                         ConfigureBroker(options);
                         options.InitialConnectionTimeout = TimeSpan.FromSeconds(5);
+                        options.ConsumerDispatchConcurrency = 20;
                     });
 
                 builder.Exchanges.AddFanOut(DeadLetterExchange);
@@ -173,6 +176,7 @@ public class TestBase
                 services.AddSingleton<ReceivedMessages>();
                 services.AddSingleton<ReceivedResponses>();
                 services.AddSingleton<DeadLetterConsumer>();
+                services.AddSingleton<BarrierBag>();
             });
 
         return consumerHost;

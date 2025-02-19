@@ -1,4 +1,5 @@
-﻿using CarrotMQ.RabbitMQ.Test.Integration.Handlers;
+﻿using System.Diagnostics.Tracing;
+using CarrotMQ.RabbitMQ.Test.Integration.Handlers;
 using CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
 
 namespace CarrotMQ.RabbitMQ.Test.Integration.EventTests;
@@ -18,6 +19,26 @@ public class ExchangeEndPointEventTest : TestBaseNoReply
         await CarrotClient.PublishAsync(new ExchangeEndPointEvent(id));
 
         await VerifyOk(id);
+    }
+
+    [TestMethod]
+    [Timeout(5000)]
+    public async Task ExchangeEndPoint_Event_Load_OK()
+    {
+        const int eventCount = 10; 
+        Guid barrierId = Guid.NewGuid();
+        var barrier = new Barrier(eventCount + 1);
+        BarrierBag.Barriers.Add(barrierId, barrier);
+
+        for (int i = 0; i < eventCount; i++)
+        {
+            await CarrotClient.PublishAsync(new ExchangeEndPointEvent(i)
+            {
+                BarrierId = barrierId
+            });
+        }
+
+        barrier.SignalAndWait();
     }
 
     [TestMethod]
