@@ -70,7 +70,8 @@ public sealed class BrokerConnectionOptions
     public TimeSpan InitialConnectionTimeout { get; set; } = Timeout.InfiniteTimeSpan;
 
     /// <summary>
-    /// Concurrency level for consumer dispatch.
+    /// Concurrency level for consumer dispatch.<br />
+    /// Defaults to <c>4</c>.
     /// </summary>
     /// <remarks>
     /// 0 means ConsumerDispatchConcurrency is not set on the ConnectionFactory, defaults to 1<br />
@@ -78,7 +79,7 @@ public sealed class BrokerConnectionOptions
     /// The work will be offloaded to the worker thread pool so it is important to choose the value for the concurrency wisely
     /// to avoid thread pool overloading.
     /// </remarks>
-    public ushort ConsumerDispatchConcurrency { get; set; }
+    public ushort ConsumerDispatchConcurrency { get; set; } = 4;
 
     /// <summary>
     /// Configure options on <see cref="ConnectionFactory" />
