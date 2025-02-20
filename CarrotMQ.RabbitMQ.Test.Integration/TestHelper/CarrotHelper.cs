@@ -11,8 +11,7 @@ public class CarrotHelper : IDisposable
     public CarrotHelper(
         string serviceName,
         Action<CarrotConfigurationBuilder>? customConfig = null,
-        Action<IServiceCollection>? serviceCollectionConfig = null,
-        Action<BrokerConnectionOptions>? configureBrokerConnection = null)
+        Action<IServiceCollection>? serviceCollectionConfig = null)
     {
         var applicationBuilder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(["environment=Development"]);
 
@@ -24,7 +23,6 @@ public class CarrotHelper : IDisposable
                     {
                         TestBase.ConfigureBroker(options);
                         options.ServiceName = serviceName;
-                        configureBrokerConnection?.Invoke(options);
                     });
 
                 customConfig?.Invoke(builder);

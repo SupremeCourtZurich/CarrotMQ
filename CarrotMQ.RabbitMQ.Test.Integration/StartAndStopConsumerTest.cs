@@ -36,8 +36,7 @@ public class StartAndStopConsumerTest
                 builder.Handlers.AddEvent<TestEventHandler, TestEvent>()
                     .BindTo(exchange, queue);
             },
-            services => { services.AddSingleton<ReceivedMessages>(); },
-            options => options.ConsumerDispatchConcurrency = 1);
+            services => { services.AddSingleton<ReceivedMessages>(); });
 
         _client = _carrotHelper.Host.Services.GetRequiredService<ICarrotClient>();
         _carrotConsumerManager = _carrotHelper.Host.Services.GetRequiredService<ICarrotConsumerManager>();
