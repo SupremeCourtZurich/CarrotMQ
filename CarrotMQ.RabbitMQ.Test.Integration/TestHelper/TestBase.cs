@@ -106,7 +106,7 @@ public class TestBase
         options.BrokerEndPoints = [new Uri(RabbitMqConnectionString)];
         options.VHost = RabbitMqVhost;
         options.ServiceName = "CarrotMQ.RabbitMQ.Test.Integration";
-
+        options.ConsumerDispatchConcurrency = 1;
         return options;
     }
 
