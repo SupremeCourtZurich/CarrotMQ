@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Configuration;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -41,10 +42,11 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, basicPropertiesMapper, loggerFactory)
     {
         _dateTimeProvider = dateTimeProvider ?? new DateTimeProvider();
         _timer = intervalTimer ?? new IntervalTimer(options.RepublishEvaluationIntervalInMs);
@@ -65,6 +67,7 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="options">The options for publisher confirms.</param>
+    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <param name="intervalTimer">The interval timer for republishing.</param>
     /// <param name="dateTimeProvider">The date and time provider for time-related operations.</param>
@@ -73,6 +76,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
@@ -81,6 +85,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             connection,
             networkRecoveryInterval,
             options,
+            basicPropertiesMapper,
             loggerFactory,
             intervalTimer,
             dateTimeProvider);

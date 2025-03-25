@@ -28,6 +28,7 @@ public static class ServiceCollectionExtension
         services.AddSingleton<ICarrotConsumerManager, CarrotConsumerManager>();
         services.AddSingleton<ITransport, RabbitTransport>();
         services.TryAddSingleton<IProtocolSerializer, ProtocolSerializer>();
+        services.TryAddSingleton<IBasicPropertiesMapper, BasicPropertiesMapper>();
 
         return services;
     }

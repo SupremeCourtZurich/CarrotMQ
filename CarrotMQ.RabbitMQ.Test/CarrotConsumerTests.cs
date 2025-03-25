@@ -165,6 +165,7 @@ public class CarrotConsumerTests
             _messageDistributor,
             _brokerConnection,
             new ProtocolSerializer(),
+            new BasicPropertiesMapper(),
             TestLoggerFactory.CreateLogger<CarrotConsumer>(),
             Substitute.For<ICarrotMetricsRecorder>(),
             Options.Create(new CarrotTracingOptions()));

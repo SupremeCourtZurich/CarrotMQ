@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Protocol;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -22,9 +23,10 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
 
     private DirectReplyChannel(
         IConnection connection,
-        TimeSpan networkRecoveryInterval,
+        TimeSpan networkRecoveryInterval, 
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, basicPropertiesMapper, loggerFactory)
     {
     }
 
@@ -70,14 +72,16 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
     /// </summary>
     /// <param name="connection">The broker connection.</param>
     /// <param name="networkRecoveryInterval"></param>
+    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
     public new static async Task<IDirectReplyChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, loggerFactory);
+        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, basicPropertiesMapper, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

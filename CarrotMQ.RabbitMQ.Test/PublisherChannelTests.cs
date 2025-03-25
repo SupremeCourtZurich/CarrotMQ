@@ -1,6 +1,7 @@
 ﻿using CarrotMQ.Core;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
@@ -42,7 +43,7 @@ public class PublisherChannelTests
                     .SetMinimumLevel(LogLevel.Trace)
                     .AddConsole();
             });
-        _channel = await PublisherChannel.CreateAsync(connection, TimeSpan.FromSeconds(2), loggerFactory).ConfigureAwait(false);
+        _channel = await PublisherChannel.CreateAsync(connection, TimeSpan.FromSeconds(2), new BasicPropertiesMapper(), loggerFactory).ConfigureAwait(false);
     }
 
     [TestMethod]

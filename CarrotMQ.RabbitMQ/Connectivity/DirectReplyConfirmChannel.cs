@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Configuration;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -25,8 +26,9 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, publisherConfirmOptions, loggerFactory)
+        : base(connection, networkRecoveryInterval, publisherConfirmOptions, basicPropertiesMapper, loggerFactory)
     {
     }
 
@@ -78,15 +80,17 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
     /// <param name="connection">The broker connection.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="publisherConfirmOptions">The options for publisher confirms.</param>
+    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
     public static async Task<IDirectReplyChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
+        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new DirectReplyConfirmChannel(connection, networkRecoveryInterval, publisherConfirmOptions, loggerFactory);
+        var channel = new DirectReplyConfirmChannel(connection, networkRecoveryInterval, publisherConfirmOptions, basicPropertiesMapper, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
         channel.StartRepublishingTimer();
 

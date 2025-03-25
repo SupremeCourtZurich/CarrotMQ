@@ -2,6 +2,7 @@
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Configuration;
 using CarrotMQ.RabbitMQ.Connectivity;
+using CarrotMQ.RabbitMQ.Serialization;
 using CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -30,6 +31,7 @@ public class ConsumerChannelRecoveryTestTestBase
                 connection,
                 brokerConnection.NetworkRecoveryInterval,
                 new PublisherConfirmOptions(),
+                new BasicPropertiesMapper(),
                 loggerFactory)
             .ConfigureAwait(false);
 
