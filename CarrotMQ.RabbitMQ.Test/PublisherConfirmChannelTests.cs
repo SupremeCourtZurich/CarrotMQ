@@ -33,7 +33,6 @@ public class PublisherConfirmChannelTests
     private int _channelDeliveryTagCounter;
 #endif
     private PublisherConfirmChannel _publisherConfirmChannel = null!;
-    private IProtocolSerializer _protocolSerializer = null!;
 
     [TestInitialize]
     public async Task Initialize()
@@ -68,13 +67,12 @@ public class PublisherConfirmChannelTests
                 _connection,
                 TimeSpan.FromSeconds(2),
                 _publisherConfirmOptions,
+                new ProtocolSerializer(),
                 new BasicPropertiesMapper(),
                 TestLoggerFactory.Instance,
                 _intervalTimer,
                 _dateTimeProvider) as PublisherConfirmChannel
             ?? throw new InvalidOperationException();
-
-        _protocolSerializer = new ProtocolSerializer();
 
         await VerifyInitialCallsAsync().ConfigureAwait(false);
 
@@ -272,9 +270,8 @@ public class PublisherConfirmChannelTests
                     Arg.Any<CancellationToken>()))
             .Do(_ => { publishEvent.Set(); });
         var message = new CarrotMessage(new CarrotHeader(), string.Empty);
-        var messagePayload = _protocolSerializer.Serialize(message);
 
-        var unused = _publisherConfirmChannel.PublishAsync(messagePayload, message.Header, CancellationToken.None);
+        var unused = _publisherConfirmChannel.PublishAsync(message, CancellationToken.None);
         await Task.Delay(50).ConfigureAwait(false);
 
         // 3) Verify max messages are published
@@ -315,9 +312,8 @@ public class PublisherConfirmChannelTests
         for (var i = 0; i < noOfMessages; i++)
         {
             var message = new CarrotMessage(new CarrotHeader(), string.Empty);
-            var messagePayload = _protocolSerializer.Serialize(message);
 
-            var task = _publisherConfirmChannel.PublishAsync(messagePayload, message.Header, token);
+            var task = _publisherConfirmChannel.PublishAsync(message, token);
             publishingTasks.Add(task);
         }
 

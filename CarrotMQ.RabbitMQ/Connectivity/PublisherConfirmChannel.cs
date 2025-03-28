@@ -42,11 +42,12 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IProtocolSerializer protocolSerializer,
         IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
-        : base(connection, networkRecoveryInterval, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
     {
         _dateTimeProvider = dateTimeProvider ?? new DateTimeProvider();
         _timer = intervalTimer ?? new IntervalTimer(options.RepublishEvaluationIntervalInMs);
@@ -58,7 +59,7 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override CreateChannelOptions CreateChannelOptions()
     {
-        return new CreateChannelOptions(true, false, consumerDispatchConcurrency:null);
+        return new CreateChannelOptions(true, false, consumerDispatchConcurrency: null);
     }
 
     /// <summary>
@@ -67,6 +68,7 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="options">The options for publisher confirms.</param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <param name="intervalTimer">The interval timer for republishing.</param>
@@ -76,6 +78,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IProtocolSerializer protocolSerializer,
         IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
@@ -85,6 +88,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             connection,
             networkRecoveryInterval,
             options,
+            protocolSerializer,
             basicPropertiesMapper,
             loggerFactory,
             intervalTimer,
@@ -103,12 +107,13 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// Thrown when the <paramref name="token" /> is canceled before the publish operation completes.
     /// </exception>
     /// <exception cref="Exception">Thrown when an error occurs during the publish operation.</exception>
-    public override async Task PublishAsync(string payload, CarrotHeader messageHeader, CancellationToken token)
+    public override async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
         await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var confirmMessage = new PublisherConfirmMessage(payload, messageHeader, tcs, token);
+        string payload = ProtocolSerializer.Serialize(message);
+        var confirmMessage = new PublisherConfirmMessage(payload, message.Header, tcs, token);
 #if NET
         var reg = token.Register(() => { confirmMessage.CompletionSource.TrySetCanceled(); });
         await using var unused = reg.ConfigureAwait(false);

@@ -20,33 +20,29 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
 {
     private const string QueueName = "amq.rabbitmq.reply-to";
     private const bool AutoAck = true;
-    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<string>> _replyMapper = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<CarrotMessage>> _replyMapper = new();
 
     private DirectReplyConfirmChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
+        IProtocolSerializer protocolSerializer,
         IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, publisherConfirmOptions, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, publisherConfirmOptions, protocolSerializer, basicPropertiesMapper, loggerFactory)
     {
     }
 
     /// <summary>
     /// Publishes a message with a direct reply pattern asynchronously.
     /// </summary>
-    /// <param name="messagePayload">The payload of the message.</param>
-    /// <param name="carrotHeader">The header of the message.</param>
-    /// <param name="token">The cancellation token.</param>
-    /// <returns>A task representing the asynchronous operation. The result is the reply message.</returns>
-    public async Task<string> PublishWithReplyAsync(
-        string messagePayload,
-        CarrotHeader carrotHeader,
+    public async Task<CarrotMessage> PublishWithReplyAsync(
+        CarrotMessage message,
         CancellationToken token)
     {
-        var correlationId = (Guid)carrotHeader.CorrelationId!;
+        var correlationId = (Guid)message.Header.CorrelationId!;
 
-        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tcs = new TaskCompletionSource<CarrotMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         _replyMapper.TryAdd(correlationId, tcs);
 
         token.Register(
@@ -59,7 +55,7 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
             false);
 
         Logger.LogDebug("Publish with direct reply; CorrelationId={CorrelationId}", correlationId);
-        await PublishAsync(messagePayload, carrotHeader, token).ConfigureAwait(false);
+        await PublishAsync(message, token).ConfigureAwait(false);
 
         var result = await tcs.Task.ConfigureAwait(false);
 
@@ -80,6 +76,7 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
     /// <param name="connection">The broker connection.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="publisherConfirmOptions">The options for publisher confirms.</param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
@@ -87,10 +84,17 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
+        IProtocolSerializer protocolSerializer,
         IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new DirectReplyConfirmChannel(connection, networkRecoveryInterval, publisherConfirmOptions, basicPropertiesMapper, loggerFactory);
+        var channel = new DirectReplyConfirmChannel(
+            connection,
+            networkRecoveryInterval,
+            publisherConfirmOptions,
+            protocolSerializer,
+            basicPropertiesMapper,
+            loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
         channel.StartRepublishingTimer();
 
@@ -114,7 +118,10 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         if (!_replyMapper.TryRemove(correlationId, out var tcs)) return Task.CompletedTask;
 
         var payload = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
-        tcs.TrySetResult(payload);
+        var message = ProtocolSerializer.Deserialize(payload);
+        BasicPropertiesMapper.MapToMessage(eventArgs.BasicProperties, message);
+
+        tcs.TrySetResult(message);
 
         return Task.CompletedTask;
     }

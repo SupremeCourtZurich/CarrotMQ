@@ -8,7 +8,6 @@ using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration.Exchanges;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
-using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -19,7 +18,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
     private readonly BindingCollection _bindingCollection;
     private readonly IBrokerConnection _brokerConnection;
     private readonly ICarrotMetricsRecorder _carrotMetricsRecorder;
-    private readonly IBasicPropertiesMapper _basicPropertiesMapper;
     private readonly IOptions<CarrotTracingOptions> _carrotTracingOptions;
     private readonly AsyncLock _consumerLock = new();
     private readonly List<CarrotConsumer> _consumers = new();
@@ -27,7 +25,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
     private readonly ILogger<CarrotConsumerManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IMessageDistributor _messageDistributor;
-    private readonly IProtocolSerializer _protocolSerializer;
 
     private readonly QueueCollection _queueCollection;
 
@@ -37,10 +34,8 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
         QueueCollection queueCollection,
         IMessageDistributor messageDistributor,
         IBrokerConnection brokerConnection,
-        IProtocolSerializer protocolSerializer,
         ICarrotMetricsRecorder carrotMetricsRecorder,
         IRoutingKeyResolver routingKeyResolver,
-        IBasicPropertiesMapper basicPropertiesMapper,
         IOptions<CarrotTracingOptions> carrotTracingOptions,
         ILoggerFactory loggerFactory)
     {
@@ -49,9 +44,7 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
         _queueCollection = queueCollection;
         _messageDistributor = messageDistributor;
         _brokerConnection = brokerConnection;
-        _protocolSerializer = protocolSerializer;
         _carrotMetricsRecorder = carrotMetricsRecorder;
-        _basicPropertiesMapper = basicPropertiesMapper;
         _carrotTracingOptions = carrotTracingOptions;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<CarrotConsumerManager>();
@@ -87,8 +80,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
                     bindingsForCurrentQueue,
                     _messageDistributor,
                     _brokerConnection,
-                    _protocolSerializer,
-                    _basicPropertiesMapper,
                     _loggerFactory.CreateLogger<CarrotConsumer>(),
                     _carrotMetricsRecorder,
                     _carrotTracingOptions);

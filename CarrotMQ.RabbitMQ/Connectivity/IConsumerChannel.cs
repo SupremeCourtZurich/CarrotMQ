@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using RabbitMQ.Client.Events;
+using CarrotMQ.Core.Common;
+using CarrotMQ.Core.MessageProcessing.Delivery;
+using CarrotMQ.Core.Protocol;
 
 namespace CarrotMQ.RabbitMQ.Connectivity;
 
@@ -13,18 +15,23 @@ public interface IConsumerChannel : ICarrotChannel
     /// <summary>
     /// Triggered when consumer is unregisted from channel
     /// </summary>
-    public Core.Common.AsyncEventHandler<EventArgs>? UnregisteredAsync { get; set; }
+    public AsyncEventHandler<EventArgs>? UnregisteredAsync { get; set; }
 
     /// <summary>
     /// Triggered when consumer is registed on channel
     /// </summary>
-    public Core.Common.AsyncEventHandler<EventArgs>? RegisteredAsync { get; set; }
+    public AsyncEventHandler<EventArgs>? RegisteredAsync { get; set; }
 
     /// <summary>
     /// Starts an asynchronous consumer on the channel.
     /// </summary>
     /// <param name="queueName">The queue name to consume from.</param>
-    /// <param name="autoAck">True if autoack (no acknowledging mechnism) is used.</param>
+    /// <param name="ackCount">Acknowledgment count:
+    /// <list type="table">
+    ///     <item><c>0</c> -> autoAck</item>
+    ///     <item><c>1</c> -> ack/nack for every message</item>
+    ///     <item><c>>1</c> -> ack/nack for multiple messages</item>
+    /// </list></param>
     /// <param name="prefetchCount">
     /// Maximum number of concurrent messages that the broker will deliver, 0 if unlimited.(see
     /// <see href="https://www.rabbitmq.com/confirms.html#channel-qos-prefetch" />).
@@ -33,9 +40,9 @@ public interface IConsumerChannel : ICarrotChannel
     /// <param name="arguments">custom arguments given to the consumer.</param>
     Task StartConsumingAsync(
         string queueName,
-        bool autoAck,
+        ushort ackCount,
         ushort prefetchCount,
-        Func<BasicDeliverEventArgs, Task> consumingAsyncCallback,
+        Func<CarrotMessage, Task<DeliveryStatus>> consumingAsyncCallback,
         IDictionary<string, object?>? arguments = null);
 
     /// <summary>
