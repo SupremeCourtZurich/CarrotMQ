@@ -1,11 +1,11 @@
-﻿using System.Text;
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Threading.Channels;
+using CarrotMQ.Core.MessageProcessing.Delivery;
+using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Serialization;
 using CarrotMQ.RabbitMQ.Test.Integration.Handlers;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client.Events;
 using Channel = System.Threading.Channels.Channel;
 
 namespace CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
@@ -30,25 +30,28 @@ public sealed class DeadLetterConsumer : IAsyncDisposable
     public async Task InitializeAsync(string queueName, string exchangeName)
     {
         var connection = await _brokerConnection.ConnectAsync().ConfigureAwait(false);
-        _consumerChannel = await ConsumerChannel.CreateAsync(connection, _brokerConnection.NetworkRecoveryInterval, _loggerFactory)
+        _consumerChannel = await ConsumerChannel.CreateAsync(
+                connection,
+                _brokerConnection.NetworkRecoveryInterval,
+                _protocolSerializer,
+                _loggerFactory)
             .ConfigureAwait(false);
         var arguments = new Dictionary<string, object?> { { "x-queue-type", "quorum" } };
         await _consumerChannel.DeclareQueueAsync(queueName, true, false, false, arguments).ConfigureAwait(false);
         await _consumerChannel.BindQueueAsync(queueName, exchangeName, string.Empty).ConfigureAwait(false);
 
-        await _consumerChannel.StartConsumingAsync(queueName, true, 1, ConsumingAsyncCallback).ConfigureAwait(false);
+        await _consumerChannel.StartConsumingAsync(queueName, 0, 1, ConsumingAsyncCallback).ConfigureAwait(false);
     }
 
-    private async Task ConsumingAsyncCallback(BasicDeliverEventArgs args)
+    private async Task<DeliveryStatus> ConsumingAsyncCallback(CarrotMessage carrotMessage)
     {
-        var messageBody = Encoding.UTF8.GetString(args.Body.ToArray());
-        var carrotMessage = _protocolSerializer.Deserialize(messageBody);
-
         var payload = carrotMessage.Payload ?? string.Empty;
         _logger.LogInformation(payload);
         var msgWithId = JsonSerializer.Deserialize<DtoBase>(payload)!;
 
         await _messageChannel.Writer.WriteAsync(msgWithId.Id, CancellationToken.None).ConfigureAwait(false);
+
+        return DeliveryStatus.Ack;
     }
 
     public async ValueTask<int> ReadAsync(CancellationToken cancellationToken)

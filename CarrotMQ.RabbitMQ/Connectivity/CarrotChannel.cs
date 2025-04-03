@@ -4,8 +4,10 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
 using CarrotMQ.Core.Configuration;
+using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Configuration.Exchanges;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -21,12 +23,16 @@ internal class CarrotChannel : ICarrotChannel
     protected CarrotChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
         _networkRecoveryInterval = networkRecoveryInterval;
         Connection = connection;
+        ProtocolSerializer = protocolSerializer;
         Logger = loggerFactory.CreateLogger<CarrotChannel>();
     }
+
+    protected IProtocolSerializer ProtocolSerializer { get; }
 
     protected AsyncLock ChannelLock { get; } = new();
 
@@ -196,14 +202,16 @@ internal class CarrotChannel : ICarrotChannel
     /// </summary>
     /// <param name="connection">The <see cref="IBrokerConnection" /> associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="loggerFactory">The <see cref="ILoggerFactory" /> used for creating loggers.</param>
     /// <returns>A new instance of <see cref="ICarrotChannel" />.</returns>
     public static async Task<ICarrotChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        var channel = new CarrotChannel(connection, networkRecoveryInterval, loggerFactory);
+        var channel = new CarrotChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

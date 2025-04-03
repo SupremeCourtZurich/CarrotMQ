@@ -1,7 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
+using CarrotMQ.Core.MessageProcessing.Delivery;
+using CarrotMQ.Core.Protocol;
+using CarrotMQ.RabbitMQ.MessageProcessing;
+using CarrotMQ.RabbitMQ.MessageProcessing.Delivery;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -21,21 +27,27 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 {
     private readonly AsyncLock _consumerLock = new();
     private readonly ILogger _logger;
+    private readonly RunningTaskRegistry _runningTaskRegistry;
+    private ushort _ackCount;
+    private IAckDelivery? _ackDelivery;
     private IDictionary<string, object?>? _arguments;
     private AsyncEventingBasicConsumer? _asyncEventingBasicConsumer;
-    private bool _autoAck;
-    private Func<BasicDeliverEventArgs, Task>? _consumingAsyncCallback;
+    private Func<CarrotMessage, Task<DeliveryStatus>>? _consumingAsyncCallback;
     private string? _consumingQueueName;
     private ushort _prefetchCount;
 
     private ConsumerChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
         _logger = loggerFactory.CreateLogger<ConsumerChannel>();
+        _runningTaskRegistry = new RunningTaskRegistry();
     }
+
+    private bool AutoAck => _ackCount == 0;
 
     public Core.Common.AsyncEventHandler<EventArgs>? UnregisteredAsync { get; set; }
 
@@ -66,14 +78,15 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 
         _asyncEventingBasicConsumer = null;
         _consumingAsyncCallback = null;
+        await _runningTaskRegistry.CompleteAddingAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task StartConsumingAsync(
         string queueName,
-        bool autoAck,
+        ushort ackCount,
         ushort prefetchCount,
-        Func<BasicDeliverEventArgs, Task> consumingAsyncCallback,
+        Func<CarrotMessage, Task<DeliveryStatus>> consumingAsyncCallback,
         IDictionary<string, object?>? arguments = null)
     {
         using var scope = await _consumerLock.LockAsync().ConfigureAwait(false);
@@ -85,7 +98,7 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 
         _consumingAsyncCallback = consumingAsyncCallback;
         _consumingQueueName = queueName;
-        _autoAck = autoAck;
+        _ackCount = ackCount;
         _prefetchCount = prefetchCount;
         _arguments = arguments;
 
@@ -121,14 +134,16 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
     /// </summary>
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers for the channel.</param>
     /// <returns>A new instance of the <see cref="ConsumerChannel" /> class.</returns>
     public new static async Task<IConsumerChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        var channel = new ConsumerChannel(connection, networkRecoveryInterval, loggerFactory);
+        var channel = new ConsumerChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;
@@ -142,6 +157,16 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
         {
             await StartConsumingAsync().ConfigureAwait(false);
         }
+    }
+
+    private IAckDelivery CreateAckDelivery()
+    {
+        return _ackCount switch
+        {
+            0 => new AutoAckDelivery(_logger),
+            1 => new SingleAckDelivery(this),
+            _ => new MultiAckDelivery(this, _ackCount) // > 1
+        };
     }
 
     private async Task SetBasicQosAsync()
@@ -159,6 +184,7 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 
     private async Task StartConsumingAsync()
     {
+        _ackDelivery = CreateAckDelivery();
         _asyncEventingBasicConsumer = new AsyncEventingBasicConsumer(Channel!);
         _asyncEventingBasicConsumer.ReceivedAsync += ConsumerMessageReceivedAsync;
         _asyncEventingBasicConsumer.RegisteredAsync += ConsumerRegisteredAsync;
@@ -166,16 +192,73 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
         _asyncEventingBasicConsumer.UnregisteredAsync += ConsumerUnregisteredAsync;
 
         await SetBasicQosAsync().ConfigureAwait(false);
-        _logger.LogDebug("Start consuming {QueueName}, {AutoAck}", _consumingQueueName, _autoAck);
-        await Channel!.BasicConsumeAsync(_consumingQueueName!, _autoAck, string.Empty, _arguments, _asyncEventingBasicConsumer).ConfigureAwait(false);
+        _logger.LogDebug("Start consuming {QueueName}, {AutoAck}", _consumingQueueName, AutoAck);
+        await Channel!.BasicConsumeAsync(_consumingQueueName!, AutoAck, string.Empty, _arguments, _asyncEventingBasicConsumer).ConfigureAwait(false);
     }
 
-    private async Task ConsumerMessageReceivedAsync(object sender, BasicDeliverEventArgs e)
+    /// <summary>
+    /// Use only for testing
+    /// </summary>
+    internal async Task SendConsumerMessageReceivedEventAsync(BasicDeliverEventArgs ea)
     {
-        if (_consumingAsyncCallback != null)
+        await ConsumerMessageReceivedAsync(this, ea).ConfigureAwait(false);
+    }
+
+    private async Task ConsumerMessageReceivedAsync(object sender, BasicDeliverEventArgs ea)
+    {
+        if (_consumingAsyncCallback == null || !_runningTaskRegistry.TryAdd(ea))
         {
-            await _consumingAsyncCallback(e).ConfigureAwait(false);
+            // Do nothing. CarrotService is going to stop the consumer
+            // if auto-ack is configured --> message is lost
+            return;
         }
+
+        DeliveryStatus deliveryStatus = DeliveryStatus.Reject;
+        try
+        {
+            deliveryStatus = await _consumingAsyncCallback(DeserializeMessage(ea)).ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(
+                exception,
+                "Unhandled exception while consuming message {MessageId}; Exchange:{Exchange}, RoutingKey:{RoutingKey}, DeliveryTag:{DeliveryTag}, ConsumerTag:{ConsumerTag}",
+                ea.BasicProperties.MessageId,
+                ea.Exchange,
+                ea.RoutingKey,
+                ea.DeliveryTag,
+                ea.ConsumerTag);
+        }
+
+        try
+        {
+            await _ackDelivery!.DeliverAsync(ea.DeliveryTag, deliveryStatus).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Unhandled exception while delivering acknowledgement for message {MessageId}; Exchange:{Exchange}, RoutingKey:{RoutingKey}, DeliveryTag:{DeliveryTag}, ConsumerTag:{ConsumerTag}",
+                ea.BasicProperties.MessageId,
+                ea.Exchange,
+                ea.RoutingKey,
+                ea.DeliveryTag,
+                ea.ConsumerTag);
+        }
+
+        _runningTaskRegistry.Remove(ea);
+    }
+
+    private CarrotMessage DeserializeMessage(BasicDeliverEventArgs ea)
+    {
+#if NET
+        string payload = Encoding.UTF8.GetString(ea.Body.Span);
+#else
+        var payload = Encoding.UTF8.GetString(ea.Body.ToArray());
+#endif
+        _logger.LogDebug("Consuming {Payload} ...", payload);
+
+        return ProtocolSerializer.Deserialize(payload, ea.BasicProperties);
     }
 
     private Task ConsumerUnregisteredAsync(object sender, ConsumerEventArgs e)
@@ -228,5 +311,13 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
         Logger.LogDebug("AsyncEventingBasicConsumer.ShutdownAsync {ReplyCode}, {ReplyText}", e.ReplyCode, e.ReplyText);
 
         return Task.CompletedTask;
+    }
+
+    protected override Task DisposeChannelAsync()
+    {
+        _ackDelivery?.Dispose();
+        _ackDelivery = null;
+
+        return base.DisposeChannelAsync();
     }
 }

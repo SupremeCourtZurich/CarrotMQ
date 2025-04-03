@@ -4,6 +4,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Protocol;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -18,25 +19,25 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
 {
     private const string QueueName = "amq.rabbitmq.reply-to";
     private const bool AutoAck = true;
-    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<string>> _replyMapper = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<CarrotMessage>> _replyMapper = new();
 
     private DirectReplyChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
     }
 
     /// <inheritdoc />
-    public async Task<string> PublishWithReplyAsync(
-        string messagePayload,
-        CarrotHeader carrotHeader,
+    public async Task<CarrotMessage> PublishWithReplyAsync(
+        CarrotMessage message,
         CancellationToken token)
     {
-        var correlationId = (Guid)carrotHeader.CorrelationId!;
+        var correlationId = (Guid)message.Header.CorrelationId!;
 
-        var tcs = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var tcs = new TaskCompletionSource<CarrotMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         _replyMapper.TryAdd(correlationId, tcs);
 
         token.Register(
@@ -49,7 +50,7 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
             false);
 
         Logger.LogDebug("Publish with direct reply; CorrelationId={CorrelationId}", correlationId);
-        await PublishAsync(messagePayload, carrotHeader, token).ConfigureAwait(false);
+        await PublishAsync(message, token).ConfigureAwait(false);
 
         var result = await tcs.Task.ConfigureAwait(false);
 
@@ -70,14 +71,16 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
     /// </summary>
     /// <param name="connection">The broker connection.</param>
     /// <param name="networkRecoveryInterval"></param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
     public new static async Task<IDirectReplyChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, loggerFactory);
+        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;
@@ -100,7 +103,9 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
         if (!_replyMapper.TryRemove(correlationId, out var tcs)) return Task.CompletedTask;
 
         var payload = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
-        tcs.TrySetResult(payload);
+        var message = ProtocolSerializer.Deserialize(payload, eventArgs.BasicProperties);
+
+        tcs.TrySetResult(message);
 
         return Task.CompletedTask;
     }

@@ -1,4 +1,5 @@
 ﻿using CarrotMQ.RabbitMQ.Connectivity;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
@@ -22,7 +23,12 @@ public class ChannelDisposeTest
             });
 
         var connection = await brokerConnection.ConnectAsync().ConfigureAwait(false);
-        ICarrotChannel channel = await PublisherChannel.CreateAsync(connection, TimeSpan.FromSeconds(2), loggerFactory).ConfigureAwait(false);
+        ICarrotChannel channel = await PublisherChannel.CreateAsync(
+                connection,
+                TimeSpan.FromSeconds(2),
+                new ProtocolSerializer(),
+                loggerFactory)
+            .ConfigureAwait(false);
 
         var t1 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));
         var t2 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));

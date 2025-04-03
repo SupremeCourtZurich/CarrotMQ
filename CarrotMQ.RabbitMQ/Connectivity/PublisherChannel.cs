@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Protocol;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 
@@ -14,20 +15,23 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
     protected PublisherChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
     }
 
     /// <inheritdoc />
-    public virtual async Task PublishAsync(string payload, CarrotHeader messageHeader, CancellationToken token)
+    public virtual async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
         using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
-        var basicProperties = CreateBasicProperties(messageHeader);
+        var basicProperties = CreateBasicProperties(message.Header);
+
+        string payload = ProtocolSerializer.Serialize(message, basicProperties);
 
         await Channel!.BasicPublishAsync(
-                messageHeader.Exchange,
-                messageHeader.RoutingKey,
+                message.Header.Exchange,
+                message.Header.RoutingKey,
                 false,
                 basicProperties,
                 Encoding.UTF8.GetBytes(payload),
@@ -40,14 +44,16 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
     /// </summary>
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <returns>A new instance of the <see cref="IPublisherChannel" />.</returns>
     public new static async Task<IPublisherChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        var channel = new PublisherChannel(connection, networkRecoveryInterval, loggerFactory);
+        var channel = new PublisherChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Configuration;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -41,10 +42,11 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
-        : base(connection, networkRecoveryInterval, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
         _dateTimeProvider = dateTimeProvider ?? new DateTimeProvider();
         _timer = intervalTimer ?? new IntervalTimer(options.RepublishEvaluationIntervalInMs);
@@ -56,7 +58,7 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override CreateChannelOptions CreateChannelOptions()
     {
-        return new CreateChannelOptions(true, false, consumerDispatchConcurrency:null);
+        return new CreateChannelOptions(true, false, consumerDispatchConcurrency: null);
     }
 
     /// <summary>
@@ -65,6 +67,7 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="options">The options for publisher confirms.</param>
+    /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <param name="intervalTimer">The interval timer for republishing.</param>
     /// <param name="dateTimeProvider">The date and time provider for time-related operations.</param>
@@ -73,6 +76,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
+        IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
@@ -81,6 +85,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             connection,
             networkRecoveryInterval,
             options,
+            protocolSerializer,
             loggerFactory,
             intervalTimer,
             dateTimeProvider);
@@ -98,12 +103,14 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// Thrown when the <paramref name="token" /> is canceled before the publish operation completes.
     /// </exception>
     /// <exception cref="Exception">Thrown when an error occurs during the publish operation.</exception>
-    public override async Task PublishAsync(string payload, CarrotHeader messageHeader, CancellationToken token)
+    public override async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
         await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var confirmMessage = new PublisherConfirmMessage(payload, messageHeader, tcs, token);
+        var basicProperties = CreateBasicProperties(message.Header);
+        string payload = ProtocolSerializer.Serialize(message, basicProperties);
+        var confirmMessage = new PublisherConfirmMessage(payload, message.Header, basicProperties, tcs, token);
 #if NET
         var reg = token.Register(() => { confirmMessage.CompletionSource.TrySetCanceled(); });
         await using var unused = reg.ConfigureAwait(false);
@@ -139,7 +146,6 @@ internal class PublisherConfirmChannel : PublisherChannel
         _outstandingConfirms.TryAdd(confirmMessage.SeqNo, confirmMessage);
 
         var header = confirmMessage.MessageHeader;
-        var basicProperties = CreateBasicProperties(header);
 
         try
         {
@@ -147,7 +153,7 @@ internal class PublisherConfirmChannel : PublisherChannel
                     header.Exchange,
                     header.RoutingKey,
                     false,
-                    basicProperties,
+                    confirmMessage.BasicProperties,
                     confirmMessage.Payload,
                     confirmMessage.CancellationToken)
                 .ConfigureAwait(false);

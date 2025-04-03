@@ -1,4 +1,5 @@
 ﻿using CarrotMQ.Core.Protocol;
+using RabbitMQ.Client;
 
 namespace CarrotMQ.RabbitMQ.Serialization;
 
@@ -17,13 +18,15 @@ public interface IProtocolSerializer
     /// Serializes a <see cref="CarrotMessage" />.
     /// </summary>
     /// <param name="carrotMessage">The CarrotMQ message to be serialized.</param>
+    /// <param name="basicProperties">The basic properties (AMQP Headers) sent along the message.</param>
     /// <returns>A string representation of the serialized CarrotMQ message.</returns>
-    string Serialize(CarrotMessage carrotMessage);
+    string Serialize(CarrotMessage carrotMessage, BasicProperties basicProperties);
 
     /// <summary>
     /// Deserializes into a <see cref="CarrotMessage" />.
     /// </summary>
     /// <param name="json">The string representation to be deserialized.</param>
+    /// <param name="basicProperties">The basic properties (AMQP Headers) received along the message.</param>
     /// <returns>The deserialized CarrotMQ message.</returns>
-    CarrotMessage Deserialize(string json);
+    CarrotMessage Deserialize(string json, IReadOnlyBasicProperties basicProperties);
 }

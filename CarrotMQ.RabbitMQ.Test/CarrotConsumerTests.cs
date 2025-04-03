@@ -1,18 +1,14 @@
-﻿using System.Text;
-using CarrotMQ.Core.Configuration;
+﻿using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.MessageProcessing.Delivery;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
 using CarrotMQ.RabbitMQ.Connectivity;
-using CarrotMQ.RabbitMQ.Serialization;
 using CarrotMQ.RabbitMQ.Test.Helper;
 using Microsoft.Extensions.Options;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
-using RabbitMQ.Client;
-using RabbitMQ.Client.Events;
 
 namespace CarrotMQ.RabbitMQ.Test;
 
@@ -21,19 +17,14 @@ public class CarrotConsumerTests
 {
     private readonly TaskCompletionSource<bool> _consumerStarted = new(false);
     private readonly TaskCompletionSource<bool> _messageDistributorDelayTask = new(false);
-    private readonly List<ulong> _rejectedMessages = [];
     private IBrokerConnection _brokerConnection = null!;
 
-    private Func<BasicDeliverEventArgs, Task> _consumeAsyncFunc = null!;
+    private Func<CarrotMessage, Task<DeliveryStatus>> _consumeAsyncFunc = null!;
     private IMessageDistributor _messageDistributor = null!;
-    private IProtocolSerializer _protocolSerializer = null!;
-
-    private ulong _sentMessageCounter;
 
     [TestInitialize]
     public void Setup()
     {
-        _protocolSerializer = new ProtocolSerializer();
         _messageDistributor = Substitute.For<IMessageDistributor>();
 
         var consumerChannel = Substitute.For<IConsumerChannel>();
@@ -41,13 +32,11 @@ public class CarrotConsumerTests
         consumerChannel.When(
                 c => c.StartConsumingAsync(
                     Arg.Any<string>(),
-                    Arg.Any<bool>(),
                     Arg.Any<ushort>(),
-                    Arg.Any<Func<BasicDeliverEventArgs, Task>>(),
+                    Arg.Any<ushort>(),
+                    Arg.Any<Func<CarrotMessage, Task<DeliveryStatus>>>(),
                     Arg.Any<IDictionary<string, object?>?>()))
-            .Do(info => { _consumeAsyncFunc = info.Arg<Func<BasicDeliverEventArgs, Task>>(); });
-        consumerChannel.When(c => c.RejectAsync(Arg.Any<ulong>(), Arg.Any<bool>()))
-            .Do(info => { _rejectedMessages.Add(info.Arg<ulong>()); });
+            .Do(info => { _consumeAsyncFunc = info.Arg<Func<CarrotMessage, Task<DeliveryStatus>>>(); });
         _brokerConnection = Substitute.For<IBrokerConnection>();
         _brokerConnection.CreateConsumerChannelAsync().Returns(consumerChannel);
     }
@@ -80,12 +69,14 @@ public class CarrotConsumerTests
 
         // Let the message handling (the consume task) finish
         _messageDistributorDelayTask.SetResult(true);
-        await consumeTask.ConfigureAwait(false);
+        var deliveryStatus = await consumeTask.ConfigureAwait(false);
 
         // Wait for our stop task to finish the shutdown
         await stoppingTask.ConfigureAwait(false);
 
         await consumer.DisposeAsync().ConfigureAwait(false);
+
+        Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus);
     }
 
     [TestMethod]
@@ -120,12 +111,14 @@ public class CarrotConsumerTests
         await Task.Delay(50).ConfigureAwait(false);
 
         // Let the message handling (the consume task) finish
-        await consumeTask.ConfigureAwait(false);
+        var deliveryStatus = await consumeTask.ConfigureAwait(false);
 
         // Wait for our stop task to finish the shutdown
         await stoppingTask.ConfigureAwait(false);
 
         await consumer.DisposeAsync().ConfigureAwait(false);
+
+        Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus);
     }
 
     [TestMethod]
@@ -140,10 +133,9 @@ public class CarrotConsumerTests
 
         _messageDistributorDelayTask.SetException(new Exception("test"));
 
-        await ConsumeCarrotMessageAsync().ConfigureAwait(false);
+        var deliveryStatus = await ConsumeCarrotMessageAsync().ConfigureAwait(false);
 
-        Assert.AreEqual(1, _rejectedMessages.Count); // reject has been sent after 1s timeout despite the message not being finished processing
-        Assert.AreEqual((ulong)1, _rejectedMessages.First()); // deliveryTag of rejected message = 1
+        Assert.AreEqual(DeliveryStatus.Reject, deliveryStatus);
 
         await consumer.DisposeAsync().ConfigureAwait(false);
     }
@@ -164,28 +156,15 @@ public class CarrotConsumerTests
             [],
             _messageDistributor,
             _brokerConnection,
-            new ProtocolSerializer(),
             TestLoggerFactory.CreateLogger<CarrotConsumer>(),
             Substitute.For<ICarrotMetricsRecorder>(),
             Options.Create(new CarrotTracingOptions()));
     }
 
-    private async Task ConsumeCarrotMessageAsync()
+    private async Task<DeliveryStatus> ConsumeCarrotMessageAsync()
     {
         var carrotMessage = new CarrotMessage(new CarrotHeader { MessageId = Guid.NewGuid() }, string.Empty);
-        _sentMessageCounter++;
-        var basicProperties = Substitute.For<IBasicProperties>();
-        basicProperties.MessageId.Returns(Guid.NewGuid().ToString());
-        var payload = _protocolSerializer.Serialize(carrotMessage);
-        BasicDeliverEventArgs eventArgs = new(
-            "consumerTag",
-            _sentMessageCounter,
-            false,
-            "exchange",
-            "routingKey",
-            basicProperties,
-            Encoding.UTF8.GetBytes(payload));
 
-        await _consumeAsyncFunc(eventArgs).ConfigureAwait(false);
+        return await _consumeAsyncFunc(carrotMessage).ConfigureAwait(false);
     }
 }

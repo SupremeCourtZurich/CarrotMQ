@@ -8,7 +8,6 @@ using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.Telemetry;
 using CarrotMQ.RabbitMQ.Configuration.Exchanges;
 using CarrotMQ.RabbitMQ.Configuration.Queues;
-using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -26,7 +25,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
     private readonly ILogger<CarrotConsumerManager> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IMessageDistributor _messageDistributor;
-    private readonly IProtocolSerializer _protocolSerializer;
 
     private readonly QueueCollection _queueCollection;
 
@@ -36,7 +34,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
         QueueCollection queueCollection,
         IMessageDistributor messageDistributor,
         IBrokerConnection brokerConnection,
-        IProtocolSerializer protocolSerializer,
         ICarrotMetricsRecorder carrotMetricsRecorder,
         IRoutingKeyResolver routingKeyResolver,
         IOptions<CarrotTracingOptions> carrotTracingOptions,
@@ -47,7 +44,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
         _queueCollection = queueCollection;
         _messageDistributor = messageDistributor;
         _brokerConnection = brokerConnection;
-        _protocolSerializer = protocolSerializer;
         _carrotMetricsRecorder = carrotMetricsRecorder;
         _carrotTracingOptions = carrotTracingOptions;
         _loggerFactory = loggerFactory;
@@ -84,7 +80,6 @@ internal class CarrotConsumerManager : ICarrotConsumerManager
                     bindingsForCurrentQueue,
                     _messageDistributor,
                     _brokerConnection,
-                    _protocolSerializer,
                     _loggerFactory.CreateLogger<CarrotConsumer>(),
                     _carrotMetricsRecorder,
                     _carrotTracingOptions);

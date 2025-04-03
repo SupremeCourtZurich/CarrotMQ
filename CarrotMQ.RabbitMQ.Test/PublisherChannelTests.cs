@@ -1,6 +1,7 @@
 ﻿using CarrotMQ.Core;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
+using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
@@ -42,14 +43,19 @@ public class PublisherChannelTests
                     .SetMinimumLevel(LogLevel.Trace)
                     .AddConsole();
             });
-        _channel = await PublisherChannel.CreateAsync(connection, TimeSpan.FromSeconds(2), loggerFactory).ConfigureAwait(false);
+        _channel = await PublisherChannel.CreateAsync(
+                connection,
+                TimeSpan.FromSeconds(2),
+                new ProtocolSerializer(),
+                loggerFactory)
+            .ConfigureAwait(false);
     }
 
     [TestMethod]
     public async Task BasicProperties_ContentType()
     {
         var header = new CarrotHeader();
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual("application/json", _basicProperties.ContentType);
     }
@@ -60,7 +66,7 @@ public class PublisherChannelTests
     public async Task BasicProperties_Persistent(bool persistent)
     {
         var header = new CarrotHeader { MessageProperties = new MessageProperties { Persistent = persistent } };
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(persistent, _basicProperties.Persistent);
     }
@@ -72,7 +78,7 @@ public class PublisherChannelTests
     public async Task BasicProperties_Priority(byte priority)
     {
         var header = new CarrotHeader { MessageProperties = new MessageProperties { Priority = priority } };
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(priority, _basicProperties.Priority);
     }
@@ -85,7 +91,7 @@ public class PublisherChannelTests
         Guid? correlationId = null;
         if (Guid.TryParse(id, out var parsedId)) correlationId = parsedId;
         var header = new CarrotHeader { CorrelationId = correlationId };
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(id, _basicProperties.CorrelationId);
     }
@@ -98,7 +104,7 @@ public class PublisherChannelTests
     public async Task BasicProperties_Expiration(int? ttl, string? result)
     {
         var header = new CarrotHeader { MessageProperties = new MessageProperties { Ttl = ttl } };
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(result, _basicProperties.Expiration);
     }
@@ -106,9 +112,9 @@ public class PublisherChannelTests
     [TestMethod]
     public async Task BasicProperties_MessageId()
     {
-        var messageId = new Guid();
+        var messageId = Guid.Empty;
         var header = new CarrotHeader();
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(messageId.ToString(), _basicProperties.MessageId);
     }
@@ -116,9 +122,9 @@ public class PublisherChannelTests
     [TestMethod]
     public async Task BasicProperties_AppId()
     {
-        var appId = new Guid();
+        var appId = Guid.Empty;
         var header = new CarrotHeader { ServiceInstanceId = appId };
-        await _channel.PublishAsync(string.Empty, header, CancellationToken.None);
+        await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(appId.ToString(), _basicProperties.AppId);
     }
