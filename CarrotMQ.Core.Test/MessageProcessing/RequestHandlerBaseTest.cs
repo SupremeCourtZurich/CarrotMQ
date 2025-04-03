@@ -4,6 +4,7 @@ using CarrotMQ.Core.Handlers.HandlerResults;
 using CarrotMQ.Core.MessageProcessing.Delivery;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Test.Helper;
+using RetryResult = CarrotMQ.Core.Handlers.HandlerResults.RetryResult;
 
 namespace CarrotMQ.Core.Test.MessageProcessing;
 
