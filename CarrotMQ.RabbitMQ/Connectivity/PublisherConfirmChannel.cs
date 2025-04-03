@@ -112,8 +112,9 @@ internal class PublisherConfirmChannel : PublisherChannel
         await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        string payload = ProtocolSerializer.Serialize(message);
-        var confirmMessage = new PublisherConfirmMessage(payload, message.Header, tcs, token);
+        var basicProperties = CreateBasicProperties(message.Header);
+        string payload = ProtocolSerializer.Serialize(message, basicProperties);
+        var confirmMessage = new PublisherConfirmMessage(payload, message.Header, basicProperties, tcs, token);
 #if NET
         var reg = token.Register(() => { confirmMessage.CompletionSource.TrySetCanceled(); });
         await using var unused = reg.ConfigureAwait(false);
@@ -149,7 +150,6 @@ internal class PublisherConfirmChannel : PublisherChannel
         _outstandingConfirms.TryAdd(confirmMessage.SeqNo, confirmMessage);
 
         var header = confirmMessage.MessageHeader;
-        var basicProperties = CreateBasicProperties(header);
 
         try
         {
@@ -157,7 +157,7 @@ internal class PublisherConfirmChannel : PublisherChannel
                     header.Exchange,
                     header.RoutingKey,
                     false,
-                    basicProperties,
+                    confirmMessage.BasicProperties,
                     confirmMessage.Payload,
                     confirmMessage.CancellationToken)
                 .ConfigureAwait(false);

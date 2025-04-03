@@ -20,10 +20,7 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
         ILoggerFactory loggerFactory)
         : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
     {
-
     }
-
-
 
     /// <inheritdoc />
     public virtual async Task PublishAsync(CarrotMessage message, CancellationToken token)
@@ -31,7 +28,7 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
         using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
         var basicProperties = CreateBasicProperties(message.Header);
 
-        string payload = ProtocolSerializer.Serialize(message);
+        string payload = ProtocolSerializer.Serialize(message, basicProperties);
 
         await Channel!.BasicPublishAsync(
                 message.Header.Exchange,
@@ -67,6 +64,21 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
 
     protected virtual BasicProperties CreateBasicProperties(CarrotHeader header)
     {
-        return BasicPropertiesMapper.CreateBasicProperties(header);
+        var unixTime = DateTimeOffset.Now.ToUnixTimeSeconds();
+
+        var basicProperties = new BasicProperties
+        {
+            ContentType = "application/json",
+            Persistent = header.MessageProperties.Persistent,
+            Priority = header.MessageProperties.Priority,
+            CorrelationId = header.CorrelationId?.ToString(),
+            Expiration = header.MessageProperties.Ttl >= 0 ? header.MessageProperties.Ttl.ToString() : null,
+            MessageId = header.MessageId.ToString(),
+            Timestamp = new AmqpTimestamp(unixTime),
+            Type = nameof(CarrotMessage),
+            AppId = header.ServiceInstanceId.ToString()
+        };
+
+        return basicProperties;
     }
 }

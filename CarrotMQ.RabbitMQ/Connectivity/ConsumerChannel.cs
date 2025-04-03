@@ -261,10 +261,7 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 #endif
         _logger.LogDebug("Consuming {Payload} ...", payload);
 
-        var carrotMessage = ProtocolSerializer.Deserialize(payload);
-        BasicPropertiesMapper.MapToMessage(ea.BasicProperties, carrotMessage);
-
-        return carrotMessage;
+        return ProtocolSerializer.Deserialize(payload, ea.BasicProperties);
     }
 
     private Task ConsumerUnregisteredAsync(object sender, ConsumerEventArgs e)

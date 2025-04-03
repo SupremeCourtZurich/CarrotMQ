@@ -3,6 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Protocol;
+using RabbitMQ.Client;
 
 namespace CarrotMQ.RabbitMQ.Connectivity;
 
@@ -14,11 +15,13 @@ internal sealed class PublisherConfirmMessage
     public PublisherConfirmMessage(
         string messagePayload,
         CarrotHeader messageHeader,
+        BasicProperties basicProperties,
         TaskCompletionSource<bool> taskCompletionSource,
         CancellationToken cancellationToken)
     {
         MessagePayload = messagePayload;
         MessageHeader = messageHeader;
+        BasicProperties = basicProperties;
         CancellationToken = cancellationToken;
         CompletionSource = taskCompletionSource;
 
@@ -40,6 +43,8 @@ internal sealed class PublisherConfirmMessage
     public string MessagePayload { get; }
 
     public CarrotHeader MessageHeader { get; }
+
+    public BasicProperties BasicProperties { get; }
 
     public CancellationToken CancellationToken { get; }
 

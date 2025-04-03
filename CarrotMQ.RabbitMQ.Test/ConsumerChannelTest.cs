@@ -103,7 +103,7 @@ public class ConsumerChannelTest
     {
         var serializer = new ProtocolSerializer();
         var carrotMessage = new CarrotMessage(new CarrotHeader { MessageId = Guid.NewGuid() }, string.Empty);
-        ReadOnlyMemory<byte> bytePayload = Encoding.UTF8.GetBytes(serializer.Serialize(carrotMessage));
+        ReadOnlyMemory<byte> bytePayload = Encoding.UTF8.GetBytes(serializer.Serialize(carrotMessage, new BasicProperties()));
 
         await _consumerChannel.SendConsumerMessageReceivedEventAsync(
                 new BasicDeliverEventArgs($"{_consumerTag++}", 1, false, "", "", new BasicProperties(), bytePayload))

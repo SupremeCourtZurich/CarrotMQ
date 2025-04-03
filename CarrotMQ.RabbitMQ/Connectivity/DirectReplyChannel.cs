@@ -106,8 +106,7 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
         if (!_replyMapper.TryRemove(correlationId, out var tcs)) return Task.CompletedTask;
 
         var payload = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
-        var message = ProtocolSerializer.Deserialize(payload);
-        BasicPropertiesMapper.MapToMessage(eventArgs.BasicProperties, message);
+        var message = ProtocolSerializer.Deserialize(payload, eventArgs.BasicProperties);
 
         tcs.TrySetResult(message);
 
