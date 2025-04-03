@@ -25,9 +25,8 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
     }
 
@@ -73,17 +72,15 @@ internal sealed class DirectReplyChannel : PublisherChannel, IDirectReplyChannel
     /// <param name="connection">The broker connection.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
     public new static async Task<IDirectReplyChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory);
+        var channel = new DirectReplyChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

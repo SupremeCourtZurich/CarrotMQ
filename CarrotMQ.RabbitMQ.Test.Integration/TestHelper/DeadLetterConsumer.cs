@@ -34,7 +34,6 @@ public sealed class DeadLetterConsumer : IAsyncDisposable
                 connection,
                 _brokerConnection.NetworkRecoveryInterval,
                 _protocolSerializer,
-                new BasicPropertiesMapper(),
                 _loggerFactory)
             .ConfigureAwait(false);
         var arguments = new Dictionary<string, object?> { { "x-queue-type", "quorum" } };

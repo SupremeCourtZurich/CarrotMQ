@@ -43,11 +43,10 @@ internal class PublisherConfirmChannel : PublisherChannel
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
-        : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
         _dateTimeProvider = dateTimeProvider ?? new DateTimeProvider();
         _timer = intervalTimer ?? new IntervalTimer(options.RepublishEvaluationIntervalInMs);
@@ -69,7 +68,6 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="options">The options for publisher confirms.</param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <param name="intervalTimer">The interval timer for republishing.</param>
     /// <param name="dateTimeProvider">The date and time provider for time-related operations.</param>
@@ -79,7 +77,6 @@ internal class PublisherConfirmChannel : PublisherChannel
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions options,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory,
         IIntervalTimer? intervalTimer = null,
         IDateTimeProvider? dateTimeProvider = null)
@@ -89,7 +86,6 @@ internal class PublisherConfirmChannel : PublisherChannel
             networkRecoveryInterval,
             options,
             protocolSerializer,
-            basicPropertiesMapper,
             loggerFactory,
             intervalTimer,
             dateTimeProvider);

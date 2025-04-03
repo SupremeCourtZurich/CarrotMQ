@@ -28,7 +28,6 @@ public class ConsumerChannelRecoveryTestTestBase
                 connection,
                 brokerConnection.NetworkRecoveryInterval,
                 protocolSerializer,
-                new BasicPropertiesMapper(),
                 loggerFactory)
             .ConfigureAwait(false);
         await using var _1 = consumer.ConfigureAwait(false);
@@ -38,7 +37,6 @@ public class ConsumerChannelRecoveryTestTestBase
                 brokerConnection.NetworkRecoveryInterval,
                 new PublisherConfirmOptions(),
                 protocolSerializer,
-                new BasicPropertiesMapper(),
                 loggerFactory)
             .ConfigureAwait(false);
 

@@ -18,7 +18,6 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 /// </summary>
 public sealed class BrokerConnection : IBrokerConnection
 {
-    private readonly IBasicPropertiesMapper _basicPropertiesMapper;
     private readonly BrokerConnectionOptions _brokerConnectionOptions;
     private readonly AsyncLock _channelsLock = new();
     private readonly ConnectionFactory _connectionFactory;
@@ -41,14 +40,12 @@ public sealed class BrokerConnection : IBrokerConnection
     /// <param name="brokerConnectionOptions">Options for configuring the broker connection.</param>
     /// <param name="endpointResolver">The resolver for RabbitMQ endpoints.</param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="logger">The logger instance.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     public BrokerConnection(
         IOptions<BrokerConnectionOptions> brokerConnectionOptions,
         IEndpointResolver endpointResolver,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILogger<BrokerConnection> logger,
         ILoggerFactory loggerFactory)
     {
@@ -60,7 +57,6 @@ public sealed class BrokerConnection : IBrokerConnection
 
         _endpointResolver = endpointResolver;
         _protocolSerializer = protocolSerializer;
-        _basicPropertiesMapper = basicPropertiesMapper;
         _logger = logger;
         _loggerFactory = loggerFactory;
 
@@ -190,7 +186,7 @@ public sealed class BrokerConnection : IBrokerConnection
 
         var connection = await ConnectAsync().ConfigureAwait(false);
         _publisherChannelWithoutConfirms =
-            await PublisherChannel.CreateAsync(connection, NetworkRecoveryInterval, _protocolSerializer, _basicPropertiesMapper, _loggerFactory)
+            await PublisherChannel.CreateAsync(connection, NetworkRecoveryInterval, _protocolSerializer, _loggerFactory)
                 .ConfigureAwait(false);
 
         _publisherChannelWithoutConfirms.TransportErrorReceived += OnTransportErrorReceivedFromChannel;
@@ -213,7 +209,6 @@ public sealed class BrokerConnection : IBrokerConnection
                 NetworkRecoveryInterval,
                 _brokerConnectionOptions.PublisherConfirm,
                 _protocolSerializer,
-                _basicPropertiesMapper,
                 _loggerFactory)
             .ConfigureAwait(false);
 
@@ -236,7 +231,6 @@ public sealed class BrokerConnection : IBrokerConnection
                 connection,
                 NetworkRecoveryInterval,
                 _protocolSerializer,
-                _basicPropertiesMapper,
                 _loggerFactory)
             .ConfigureAwait(false);
 
@@ -261,7 +255,6 @@ public sealed class BrokerConnection : IBrokerConnection
                     NetworkRecoveryInterval,
                     _brokerConnectionOptions.PublisherConfirm,
                     _protocolSerializer,
-                    _basicPropertiesMapper,
                     _loggerFactory)
                 .ConfigureAwait(false);
 
@@ -274,7 +267,12 @@ public sealed class BrokerConnection : IBrokerConnection
     public async Task<IConsumerChannel> CreateConsumerChannelAsync()
     {
         var connection = await ConnectAsync().ConfigureAwait(false);
-        var channel = await ConsumerChannel.CreateAsync(connection, NetworkRecoveryInterval, _protocolSerializer, _basicPropertiesMapper, _loggerFactory).ConfigureAwait(false);
+        var channel = await ConsumerChannel.CreateAsync(
+                connection,
+                NetworkRecoveryInterval,
+                _protocolSerializer,
+                _loggerFactory)
+            .ConfigureAwait(false);
         channel.TransportErrorReceived += OnTransportErrorReceivedFromChannel;
 
         return channel;

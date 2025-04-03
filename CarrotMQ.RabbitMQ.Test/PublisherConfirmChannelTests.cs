@@ -68,7 +68,6 @@ public class PublisherConfirmChannelTests
                 TimeSpan.FromSeconds(2),
                 _publisherConfirmOptions,
                 new ProtocolSerializer(),
-                new BasicPropertiesMapper(),
                 TestLoggerFactory.Instance,
                 _intervalTimer,
                 _dateTimeProvider) as PublisherConfirmChannel

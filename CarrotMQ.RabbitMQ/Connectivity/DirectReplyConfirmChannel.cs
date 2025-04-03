@@ -27,9 +27,8 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, publisherConfirmOptions, protocolSerializer, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, publisherConfirmOptions, protocolSerializer, loggerFactory)
     {
     }
 
@@ -77,7 +76,6 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="publisherConfirmOptions">The options for publisher confirms.</param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory.</param>
     /// <returns>A new instance of <see cref="IDirectReplyChannel" />.</returns>
     public static async Task<IDirectReplyChannel> CreateAsync(
@@ -85,7 +83,6 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         TimeSpan networkRecoveryInterval,
         PublisherConfirmOptions publisherConfirmOptions,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
         var channel = new DirectReplyConfirmChannel(
@@ -93,7 +90,6 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
             networkRecoveryInterval,
             publisherConfirmOptions,
             protocolSerializer,
-            basicPropertiesMapper,
             loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
         channel.StartRepublishingTimer();

@@ -47,7 +47,6 @@ public class PublisherChannelTests
                 connection,
                 TimeSpan.FromSeconds(2),
                 new ProtocolSerializer(),
-                new BasicPropertiesMapper(),
                 loggerFactory)
             .ConfigureAwait(false);
     }

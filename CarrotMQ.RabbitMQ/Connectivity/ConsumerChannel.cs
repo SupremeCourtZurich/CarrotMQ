@@ -40,9 +40,8 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
         _logger = loggerFactory.CreateLogger<ConsumerChannel>();
         _runningTaskRegistry = new RunningTaskRegistry();
@@ -136,17 +135,15 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers for the channel.</param>
     /// <returns>A new instance of the <see cref="ConsumerChannel" /> class.</returns>
     public new static async Task<IConsumerChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new ConsumerChannel(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory);
+        var channel = new ConsumerChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

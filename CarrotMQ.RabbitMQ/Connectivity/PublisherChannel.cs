@@ -16,9 +16,8 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
-        : base(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory)
+        : base(connection, networkRecoveryInterval, protocolSerializer, loggerFactory)
     {
     }
 
@@ -46,17 +45,15 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
     /// <param name="connection">The broker connection associated with the channel.</param>
     /// <param name="networkRecoveryInterval"></param>
     /// <param name="protocolSerializer">The serializer for <see cref="CarrotMessage" />.</param>
-    /// <param name="basicPropertiesMapper">Mapper for the messages basic properties.</param>
     /// <param name="loggerFactory">The logger factory used to create loggers.</param>
     /// <returns>A new instance of the <see cref="IPublisherChannel" />.</returns>
     public new static async Task<IPublisherChannel> CreateAsync(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
-        IBasicPropertiesMapper basicPropertiesMapper,
         ILoggerFactory loggerFactory)
     {
-        var channel = new PublisherChannel(connection, networkRecoveryInterval, protocolSerializer, basicPropertiesMapper, loggerFactory);
+        var channel = new PublisherChannel(connection, networkRecoveryInterval, protocolSerializer, loggerFactory);
         await channel.CreateChannelAsync().ConfigureAwait(false);
 
         return channel;

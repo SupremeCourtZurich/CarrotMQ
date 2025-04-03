@@ -34,7 +34,6 @@ public class ConsumerChannelTest
                 connection,
                 TimeSpan.FromSeconds(10),
                 new ProtocolSerializer(),
-                new BasicPropertiesMapper(),
                 TestLoggerFactory.Instance)
             .ConfigureAwait(false);
 
