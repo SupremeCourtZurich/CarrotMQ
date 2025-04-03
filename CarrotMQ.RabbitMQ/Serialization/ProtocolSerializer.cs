@@ -52,7 +52,7 @@ public sealed class ProtocolSerializer : IProtocolSerializer
             carrotMessage.Header.CorrelationId = Guid.Parse(basicProperties.CorrelationId);
         }
 
-        if (!string.IsNullOrWhiteSpace(basicProperties.MessageId) && Guid.Empty.Equals(carrotMessage.Header.MessageId))
+        if (!string.IsNullOrWhiteSpace(basicProperties.MessageId) && carrotMessage.Header.MessageId == Guid.Empty)
         {
             carrotMessage.Header.MessageId = Guid.Parse(basicProperties.MessageId);
         }
