@@ -47,7 +47,7 @@ public sealed class ProtocolSerializer : IProtocolSerializer
         }
 
         if (!string.IsNullOrWhiteSpace(basicProperties.CorrelationId)
-            && (carrotMessage.Header.CorrelationId is null || Guid.Empty.Equals(carrotMessage.Header.CorrelationId)))
+            && (carrotMessage.Header.CorrelationId is null || carrotMessage.Header.CorrelationId == Guid.Empty))
         {
             carrotMessage.Header.CorrelationId = Guid.Parse(basicProperties.CorrelationId);
         }
