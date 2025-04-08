@@ -11,7 +11,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-        <PackageReference Include="RabbitMQ.Client" Version="7.0.0" />
+        <PackageReference Include="RabbitMQ.Client" Version="7.1.2" />
         <PackageReference Include="meziantou.analyzer" Version="2.0.186">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
