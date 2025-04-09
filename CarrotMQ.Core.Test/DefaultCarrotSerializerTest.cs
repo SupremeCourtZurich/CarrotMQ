@@ -1,5 +1,6 @@
 using CarrotMQ.Core.Dto;
 using CarrotMQ.Core.Serialization;
+using CarrotMQ.Core.Test.Helper;
 
 namespace CarrotMQ.Core.Test;
 
@@ -17,7 +18,7 @@ public class DefaultCarrotSerializerTest
     [TestMethod]
     public void SerializePropertiesOfDerivedClasses()
     {
-        IEvent<TestEvent, TestExchange> testEvent = new TestEvent();
+        IEvent<TestEvent, TestExchangeEndPoint> testEvent = new TestEvent();
 
         var serialized = _serializer.Serialize(testEvent);
 
@@ -39,7 +40,7 @@ public class DefaultCarrotSerializerTest
     }
 }
 
-public class TestEvent : IEvent<TestEvent, TestExchange>
+public class TestEvent : IEvent<TestEvent, TestExchangeEndPoint>
 {
     public string TestProp { get; set; } = "prop";
 }

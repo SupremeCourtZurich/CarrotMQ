@@ -158,11 +158,11 @@ public class TestBase
                 exchange.BindToQueue(queue1, QueueEndPointQuery.Response.GetRoutingKey());
 
                 builder
-                    .Handlers.AddResponse<QueueEndPointCommandResponseHandler, QueueEndPointCmd, QueueEndPointCmd.Response>();
+                    .Handlers.AddResponse<QueueEndPointCmdResponseHandler, QueueEndPointCmd, QueueEndPointCmd.Response>();
                 exchange.BindToQueue(queue1, QueueEndPointCmd.Response.GetRoutingKey());
 
                 builder
-                    .Handlers.AddResponse<ExchangeEndPointCommandResponseHandler, ExchangeEndPointCmd, ExchangeEndPointCmd.Response>();
+                    .Handlers.AddResponse<ExchangeEndPointCmdResponseHandler, ExchangeEndPointCmd, ExchangeEndPointCmd.Response>();
                 exchange.BindToQueue(queue1, ExchangeEndPointCmd.Response.GetRoutingKey());
 
                 builder

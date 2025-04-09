@@ -7,7 +7,7 @@ namespace CarrotMQ.Core.Test;
 [TestClass]
 public sealed class EndPointTests
 {
-    private IRoutingKeyResolver _resolver = default!;
+    private IRoutingKeyResolver _resolver = null!;
 
     [TestInitialize]
     public void Initialize()
@@ -59,14 +59,14 @@ public sealed class EndPointTests
         EndPointBase _ = new TestExchangeEndPoint(exchangeName);
     }
 
-    public sealed class TestQueueEndPoint : QueueEndPoint
+    private sealed class TestQueueEndPoint : QueueEndPoint
     {
         public TestQueueEndPoint(string queueName) : base(queueName)
         {
         }
     }
 
-    public sealed class TestExchangeEndPoint : ExchangeEndPoint
+    private sealed class TestExchangeEndPoint : ExchangeEndPoint
     {
         public TestExchangeEndPoint(string exchangeName) : base(exchangeName)
         {

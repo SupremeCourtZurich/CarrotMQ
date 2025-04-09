@@ -4,7 +4,9 @@ namespace CarrotMQ.Core.Test.Helper;
 
 public class TestQueueEndPoint : QueueEndPoint
 {
-    public TestQueueEndPoint() : base("TestQueue")
+    public const string TestQueueName = "TestQueue";
+
+    public TestQueueEndPoint() : base(TestQueueName)
     {
     }
 }

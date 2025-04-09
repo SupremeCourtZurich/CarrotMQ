@@ -12,7 +12,7 @@ namespace CarrotMQ.RabbitMQ.Test.Integration;
 
 [TestClass]
 [TestCategory("Integration")]
-public class ConsumerChannelRecoveryTestTestBase
+public class ConsumerChannelRecoveryTest
 {
     private const string QueueName = "test.consumer.recovery.queue";
 
@@ -46,7 +46,7 @@ public class ConsumerChannelRecoveryTestTestBase
 
         var tcsMessage1 = new TaskCompletionSource<bool>();
         var tcsMessage2 = new TaskCompletionSource<bool>();
-        var blockMesageConsumer = true;
+        var messageConsumer = true;
         await consumer.StartConsumingAsync(
                 QueueName,
                 1,
@@ -55,11 +55,11 @@ public class ConsumerChannelRecoveryTestTestBase
                 {
                     Console.WriteLine(message.Payload + " received");
                     await msgQueue.Writer.WriteAsync(int.Parse(message.Payload ?? "0")).ConfigureAwait(false);
-                    if ("1".Equals(message.Payload) && blockMesageConsumer)
+                    if ("1".Equals(message.Payload) && messageConsumer)
                     {
                         await tcsMessage1.Task.ConfigureAwait(false);
                     }
-                    else if ("2".Equals(message.Payload) && blockMesageConsumer)
+                    else if ("2".Equals(message.Payload) && messageConsumer)
                     {
                         await tcsMessage2.Task.ConfigureAwait(false);
                     }
@@ -71,7 +71,7 @@ public class ConsumerChannelRecoveryTestTestBase
         consumer.UnregisteredAsync += (_, _) =>
         {
             // Release the "old" message consumer -> if not, the new consumer channel creation is blocked
-            blockMesageConsumer = false;
+            messageConsumer = false;
             tcsMessage1.SetResult(true);
             tcsMessage2.SetResult(true);
 
