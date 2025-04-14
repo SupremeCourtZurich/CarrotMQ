@@ -3,6 +3,7 @@ using CarrotMQ.Core.EndPoints;
 using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
+using CarrotMQ.Core.Test.Helper;
 using NSubstitute;
 
 namespace CarrotMQ.Core.Test;
@@ -12,9 +13,9 @@ public class CarrotClientHeaderTests
 {
     private const string UserName = "John";
     private const string ServiceName = "MyMicroService";
-    private readonly ICommand<MyDto, TestResponse, TestQueue> _commandDto = new MyDto(1);
-    private readonly IEvent<MyDto, TestExchange> _eventDto = new MyDto(1);
-    private readonly IQuery<MyDto, TestResponse, TestQueue> _queryDto = new MyDto(1);
+    private readonly ICommand<TestDto, TestResponse, TestQueueEndPoint> _commandDto = new TestDto(1);
+    private readonly IEvent<TestDto, TestExchangeEndPoint> _eventDto = new TestDto(1);
+    private readonly IQuery<TestDto, TestResponse, TestQueueEndPoint> _queryDto = new TestDto(1);
 
     private ICarrotClient _carrotClient = default!;
     private IDependencyInjector _dependencyInjector = default!;
@@ -225,9 +226,9 @@ public class CarrotClientHeaderTests
 
         var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
-        Assert.AreEqual(typeof(MyDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
+        Assert.AreEqual(typeof(TestDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
         Assert.AreEqual(string.Empty, resultHeader.Exchange, nameof(resultHeader.Exchange));
-        Assert.AreEqual(TestQueue.TestQueueName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
+        Assert.AreEqual(TestQueueEndPoint.TestQueueName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
         Assert.AreEqual(correlationId, resultHeader.CorrelationId, nameof(resultHeader.CorrelationId));
         Assert.AreEqual(replyExchange, resultHeader.ReplyExchange, nameof(resultHeader.ReplyExchange));
         Assert.AreEqual(replyRoutingKey, resultHeader.ReplyRoutingKey, nameof(resultHeader.ReplyRoutingKey));
@@ -246,9 +247,9 @@ public class CarrotClientHeaderTests
 
         var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
-        Assert.AreEqual(typeof(MyDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
+        Assert.AreEqual(typeof(TestDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
         Assert.AreEqual(string.Empty, resultHeader.Exchange, nameof(resultHeader.Exchange));
-        Assert.AreEqual(TestQueue.TestQueueName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
+        Assert.AreEqual(TestQueueEndPoint.TestQueueName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
         Assert.AreEqual(correlationId, resultHeader.CorrelationId, nameof(resultHeader.CorrelationId));
         Assert.AreEqual(string.Empty, resultHeader.ReplyExchange, nameof(resultHeader.ReplyExchange));
         Assert.AreEqual(replyQueue, resultHeader.ReplyRoutingKey, nameof(resultHeader.ReplyRoutingKey));
@@ -341,9 +342,9 @@ public class CarrotClientHeaderTests
 
     private static void AssertGeneralPublishCarrotHeaderProperties(CarrotHeader resultHeader)
     {
-        Assert.AreEqual(typeof(MyDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
-        Assert.AreEqual(TestExchange.TestExchangeName, resultHeader.Exchange, nameof(resultHeader.Exchange));
-        Assert.AreEqual(typeof(MyDto).FullName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
+        Assert.AreEqual(typeof(TestDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
+        Assert.AreEqual(TestExchangeEndPoint.TestExchangeName, resultHeader.Exchange, nameof(resultHeader.Exchange));
+        Assert.AreEqual(typeof(TestDto).FullName, resultHeader.RoutingKey, nameof(resultHeader.RoutingKey));
         Assert.AreEqual(string.Empty, resultHeader.ReplyExchange, nameof(resultHeader.ReplyExchange));
         Assert.AreEqual(string.Empty, resultHeader.ReplyRoutingKey, nameof(resultHeader.ReplyRoutingKey));
         Assert.IsFalse(resultHeader.IncludeRequestPayloadInResponse, nameof(resultHeader.IncludeRequestPayloadInResponse));

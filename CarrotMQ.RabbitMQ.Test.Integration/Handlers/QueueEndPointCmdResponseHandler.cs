@@ -6,17 +6,17 @@ using CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
 namespace CarrotMQ.RabbitMQ.Test.Integration.Handlers;
 
 // ReSharper disable once ClassNeverInstantiated.Global
-public sealed class ExchangeEndPointCommandResponseHandler : ResponseHandlerBase<ExchangeEndPointCmd, ExchangeEndPointCmd.Response>
+public sealed class QueueEndPointCmdResponseHandler : ResponseHandlerBase<QueueEndPointCmd, QueueEndPointCmd.Response>
 {
     private readonly ReceivedResponses _receivedResponses;
 
-    public ExchangeEndPointCommandResponseHandler(ReceivedResponses receivedResponses)
+    public QueueEndPointCmdResponseHandler(ReceivedResponses receivedResponses)
     {
         _receivedResponses = receivedResponses;
     }
 
     public override async Task<IHandlerResult> HandleAsync(
-        CarrotResponse<ExchangeEndPointCmd, ExchangeEndPointCmd.Response> carrotResponse,
+        CarrotResponse<QueueEndPointCmd, QueueEndPointCmd.Response> carrotResponse,
         ConsumerContext consumerContext,
         CancellationToken cancellationToken)
     {

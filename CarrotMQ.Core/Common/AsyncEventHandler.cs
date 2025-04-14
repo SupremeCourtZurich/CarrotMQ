@@ -16,6 +16,8 @@ public delegate Task AsyncEventHandler<in TEventArs>(object sender, TEventArs e)
 /// <summary>
 /// Extension methods for <see cref="AsyncEventHandler{TEventArgs}" />.
 /// </summary>
+#pragma warning disable IDE0079 // Remove unnecessary suppression
+#pragma warning disable MA0048
 public static class AsyncEventHandlerExtensions
 {
     /// <summary>

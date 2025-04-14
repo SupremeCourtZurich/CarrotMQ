@@ -4,7 +4,9 @@ namespace CarrotMQ.Core.Test.Helper;
 
 public class TestExchangeEndPoint : ExchangeEndPoint
 {
-    public TestExchangeEndPoint() : base("TestExchange")
+    public const string TestExchangeName = "TestExchange";
+
+    public TestExchangeEndPoint() : base(TestExchangeName)
     {
     }
 }

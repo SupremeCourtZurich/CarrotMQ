@@ -2,6 +2,7 @@
 using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
+using CarrotMQ.Core.Test.Helper;
 using NSubstitute;
 
 namespace CarrotMQ.Core.Test;
@@ -32,7 +33,7 @@ public class CarrotClientResponseTests
 
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs(_ => Task.FromResult(new CarrotMessage { Payload = okResponse }));
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         CarrotResponse response = await _carrotClient.SendReceiveAsync(request).ConfigureAwait(false);
 
@@ -51,7 +52,7 @@ public class CarrotClientResponseTests
 
                     return new CarrotMessage();
                 });
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         var context = new Context(1);
         await _carrotClient.SendReceiveAsync(request, context);
@@ -63,7 +64,7 @@ public class CarrotClientResponseTests
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new OperationCanceledException());
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendReceiveAsync(request);
     }
@@ -74,7 +75,7 @@ public class CarrotClientResponseTests
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new RetryLimitExceededException());
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendReceiveAsync(request);
     }
@@ -86,7 +87,7 @@ public class CarrotClientResponseTests
         const string exMessage = "my very important message";
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new Exception(exMessage));
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendReceiveAsync(request);
     }
@@ -96,7 +97,7 @@ public class CarrotClientResponseTests
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs(_ => Task.FromResult(new CarrotMessage()));
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendAsync(request);
     }
@@ -108,7 +109,7 @@ public class CarrotClientResponseTests
         _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
             .ReturnsForAnyArgs(
                 async callInfo => { await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false); });
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         var context = new Context(1);
         await _carrotClient.SendAsync(request, context: context);
@@ -120,7 +121,7 @@ public class CarrotClientResponseTests
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
             .ReturnsForAnyArgs(_ => throw new OperationCanceledException());
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendAsync(request);
     }
@@ -129,9 +130,9 @@ public class CarrotClientResponseTests
     [ExpectedException(typeof(RetryLimitExceededException))]
     public async Task SendAsync_RetryLimitException()
     {
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => throw new RetryLimitExceededException());
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendAsync(request);
     }
@@ -141,8 +142,8 @@ public class CarrotClientResponseTests
     public async Task SendAsync_InternalServerError()
     {
         const string exMessage = "my very important message";
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), default).ReturnsForAnyArgs(_ => throw new Exception(exMessage));
-        ICommand<MyDto, TestResponse, TestQueue> request = new MyDto(1);
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None).ReturnsForAnyArgs(_ => throw new Exception(exMessage));
+        ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
         await _carrotClient.SendAsync(request);
     }
