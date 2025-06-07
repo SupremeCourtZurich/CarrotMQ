@@ -1,6 +1,7 @@
 using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.Dto;
 using CarrotMQ.Core.MessageProcessing;
+using CarrotMQ.Core.MessageSending;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 using CarrotMQ.Core.Test.Helper;
@@ -288,11 +289,8 @@ public class MessageEnricherTest
 
     private ICarrotClient CreateCarrotClient(params IMessageEnricher[] messageEnrichers)
     {
-        return new CarrotClient(
-            messageEnrichers,
-            _transport,
-            new DefaultRoutingKeyResolver(),
-            _serializer);
+        var messageBuilder = new CarrotMessageBuilder(messageEnrichers, _serializer, new DefaultRoutingKeyResolver());
+        return new CarrotClient(_transport, _serializer, messageBuilder);
     }
 
     private class TestCommand : ICommand<TestCommand, TestResponse, TestQueueEndPoint>

@@ -1,5 +1,6 @@
 ﻿using CarrotMQ.Core.Dto;
 using CarrotMQ.Core.MessageProcessing;
+using CarrotMQ.Core.MessageSending;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 using CarrotMQ.Core.Test.Helper;
@@ -10,19 +11,16 @@ namespace CarrotMQ.Core.Test;
 [TestClass]
 public class CarrotClientResponseTests
 {
-    private ICarrotClient _carrotClient = default!;
-    private ITransport _transport = default!;
+    private ICarrotClient _carrotClient = null!;
+    private ITransport _transport = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         _transport = Substitute.For<ITransport>();
         ICarrotSerializer serializer = new DefaultCarrotSerializer();
-        _carrotClient = new CarrotClient(
-            [],
-            _transport,
-            new DefaultRoutingKeyResolver(),
-            serializer);
+        var messageBuilder = new CarrotMessageBuilder([], serializer, new DefaultRoutingKeyResolver());
+        _carrotClient = new CarrotClient(_transport, serializer, messageBuilder);
     }
 
     [TestMethod]
@@ -31,7 +29,7 @@ public class CarrotClientResponseTests
         var serializer = new DefaultCarrotSerializer();
         var okResponse = serializer.Serialize(new CarrotResponse { StatusCode = CarrotStatusCode.Ok });
 
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => Task.FromResult(new CarrotMessage { Payload = okResponse }));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
@@ -62,7 +60,7 @@ public class CarrotClientResponseTests
     [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendReceiveAsync_RequestTimeout()
     {
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new OperationCanceledException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
@@ -73,7 +71,7 @@ public class CarrotClientResponseTests
     [ExpectedException(typeof(RetryLimitExceededException))]
     public async Task SendReceiveAsync_RetryLimitException()
     {
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new RetryLimitExceededException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
@@ -85,7 +83,7 @@ public class CarrotClientResponseTests
     public async Task SendReceiveAsync_InternalServerError()
     {
         const string exMessage = "my very important message";
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new Exception(exMessage));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
@@ -95,7 +93,7 @@ public class CarrotClientResponseTests
     [TestMethod]
     public async Task SendAsync_Ok()
     {
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => Task.FromResult(new CarrotMessage()));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
@@ -119,7 +117,7 @@ public class CarrotClientResponseTests
     [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendAsync_RequestTimeout()
     {
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => throw new OperationCanceledException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
