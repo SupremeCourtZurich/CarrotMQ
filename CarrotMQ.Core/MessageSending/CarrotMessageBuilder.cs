@@ -34,7 +34,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         CancellationToken cancellationToken) where TEvent : IEvent<TEvent, TExchangeEndPoint>
         where TExchangeEndPoint : ExchangeEndPoint, new()
     {
-        CarrotMessage message = await BuildCarrotMessageAsync(@event, new NoReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, new NoReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
 
         return message;
     }
@@ -47,7 +47,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         Context? context,
         CancellationToken cancellationToken) where TEvent : ICustomRoutingEvent<TEvent>
     {
-        return await BuildCarrotMessageAsyncInternal(@event, exchange, routingKey, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
+        return await BuildCarrotMessageInternalAsync(@event, exchange, routingKey, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
@@ -60,7 +60,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageAsync(command, replyEndPoint ?? new NoReplyEndPoint(), context, cancellationToken)
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(command, replyEndPoint ?? new NoReplyEndPoint(), context, cancellationToken)
             .ConfigureAwait(false);
         message.Header.CorrelationId = correlationId;
 
@@ -74,7 +74,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         where TResponse : class
         where TEndPointDefinition : EndPointBase, new()
     {
-        return await BuildCarrotMessageAsyncInternal(request, context, cancellationToken).ConfigureAwait(false);
+        return await BuildCarrotMessageInternalAsync(request, context, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TQuery, TResponse, TEndPointDefinition>(
@@ -87,7 +87,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageAsync(query, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(query, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
         message.Header.CorrelationId = correlationId;
 
         return message;
@@ -100,10 +100,10 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         where TResponse : class
         where TEndPointDefinition : EndPointBase, new()
     {
-        return await BuildCarrotMessageAsyncInternal(request, context, cancellationToken).ConfigureAwait(false);
+        return await BuildCarrotMessageInternalAsync(request, context, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<CarrotMessage> BuildCarrotMessageAsyncInternal<TRequest, TResponse, TEndPointDefinition>(
+    private async Task<CarrotMessage> BuildCarrotMessageInternalAsync<TRequest, TResponse, TEndPointDefinition>(
         _IRequest<TRequest, TResponse, TEndPointDefinition> request,
         Context? context,
         CancellationToken cancellationToken)
@@ -111,7 +111,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         where TRequest : _IRequest<TRequest, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageAsync(request, new DirectReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(request, new DirectReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
         message.Header.CorrelationId = Guid.NewGuid();
         if (message.Header.MessageProperties.Ttl == null)
         {
@@ -123,7 +123,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         return message;
     }
 
-    private Task<CarrotMessage> BuildCarrotMessageAsync<TRequest, TResponse, TEndPointDefinition>(
+    private Task<CarrotMessage> BuildCarrotMessageInternalAsync<TRequest, TResponse, TEndPointDefinition>(
         _IMessage<TRequest, TResponse, TEndPointDefinition> request,
         ReplyEndPointBase replyEndPoint,
         Context? context,
@@ -136,10 +136,10 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         string exchange = requestEndPoint.Exchange;
         string routingKey = requestEndPoint.GetRoutingKey<TRequest>(_routingKeyResolver);
 
-        return BuildCarrotMessageAsyncInternal(request, exchange, routingKey, replyEndPoint, context, cancellationToken);
+        return BuildCarrotMessageInternalAsync(request, exchange, routingKey, replyEndPoint, context, cancellationToken);
     }
 
-    private async Task<CarrotMessage> BuildCarrotMessageAsyncInternal<TRequest, TResponse>(
+    private async Task<CarrotMessage> BuildCarrotMessageInternalAsync<TRequest, TResponse>(
         _IMessage<TRequest, TResponse> request,
         string exchange,
         string routingKey,
