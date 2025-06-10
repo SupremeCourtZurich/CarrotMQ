@@ -2,7 +2,6 @@
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Dto;
-using CarrotMQ.Core.Dto.Internals;
 using CarrotMQ.Core.EndPoints;
 using CarrotMQ.Core.Protocol;
 
@@ -23,11 +22,30 @@ public interface ICarrotMessageBuilder
         where TExchangeEndPoint : ExchangeEndPoint, new();
 
     /// <inheritdoc cref="ICarrotMessageBuilder"/>
+    public Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(
+        ICustomRoutingEvent<TEvent> @event,
+        string exchange,
+        string routingKey,
+        ReplyEndPointBase replyEndPoint,
+        Context? context,
+        CancellationToken cancellationToken)
+        where TEvent : ICustomRoutingEvent<TEvent>;
+
+    /// <inheritdoc cref="ICarrotMessageBuilder"/>
     public Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint,
         Context? context,
         Guid? correlationId,
+        CancellationToken cancellationToken)
+        where TResponse : class
+        where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
+        where TEndPointDefinition : EndPointBase, new();
+
+    /// <inheritdoc cref="ICarrotMessageBuilder"/>
+    public Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
+        ICommand<TCommand, TResponse, TEndPointDefinition> request,
+        Context? context,
         CancellationToken cancellationToken)
         where TResponse : class
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
@@ -45,22 +63,11 @@ public interface ICarrotMessageBuilder
         where TEndPointDefinition : EndPointBase, new();
 
     /// <inheritdoc cref="ICarrotMessageBuilder"/>
-    public Task<CarrotMessage> BuildCarrotMessageAsync<TRequest, TResponse, TEndPointDefinition>(
-        _IRequest<TRequest, TResponse, TEndPointDefinition> request,
+    public Task<CarrotMessage> BuildCarrotMessageAsync<TQuery, TResponse, TEndPointDefinition>(
+        IQuery<TQuery, TResponse, TEndPointDefinition> request,
         Context? context,
         CancellationToken cancellationToken)
         where TResponse : class
-        where TRequest : _IRequest<TRequest, TResponse, TEndPointDefinition>
+        where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new();
-
-    /// <inheritdoc cref="ICarrotMessageBuilder"/>
-    public Task<CarrotMessage> BuildCarrotMessageAsync<TRequest, TResponse>(
-        _IMessage<TRequest, TResponse> request,
-        string exchange,
-        string routingKey,
-        ReplyEndPointBase replyEndPoint,
-        Context? context,
-        CancellationToken cancellationToken)
-        where TResponse : class
-        where TRequest : _IMessage<TRequest, TResponse>;
 }

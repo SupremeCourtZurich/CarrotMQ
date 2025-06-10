@@ -17,16 +17,16 @@ namespace CarrotMQ.Core;
 /// </summary>
 public sealed class CarrotClient : ICarrotClient
 {
+    private readonly ICarrotMessageBuilder _messageBuilder;
     private readonly ICarrotSerializer _serializer;
     private readonly ITransport _transport;
-    private readonly ICarrotMessageBuilder _messageBuilder;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CarrotClient" /> class.
     /// </summary>
     /// <param name="transport">The transport mechanism for message exchange.</param>
     /// <param name="serializer">The serializer for message payloads.</param>
-    /// <param name="messageBuilder">The message builder used to convert typed messages into <see cref="CarrotMessage"/>s</param>
+    /// <param name="messageBuilder">The message builder used to convert typed messages into <see cref="CarrotMessage" />s</param>
     public CarrotClient(
         ITransport transport,
         ICarrotSerializer serializer,
@@ -44,7 +44,7 @@ public sealed class CarrotClient : ICarrotClient
         CancellationToken cancellationToken = default)
         where TEvent : ICustomRoutingEvent<TEvent>
     {
-        var message = await _messageBuilder
+        CarrotMessage message = await _messageBuilder
             .BuildCarrotMessageAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
             .ConfigureAwait(false);
 
@@ -75,7 +75,7 @@ public sealed class CarrotClient : ICarrotClient
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await _messageBuilder
+        CarrotMessage message = await _messageBuilder
             .BuildCarrotMessageAsync(command, context, cancellationToken)
             .ConfigureAwait(false);
 
@@ -92,7 +92,7 @@ public sealed class CarrotClient : ICarrotClient
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await _messageBuilder
+        CarrotMessage message = await _messageBuilder
             .BuildCarrotMessageAsync(query, context, cancellationToken)
             .ConfigureAwait(false);
 
@@ -111,7 +111,7 @@ public sealed class CarrotClient : ICarrotClient
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await _messageBuilder
+        CarrotMessage message = await _messageBuilder
             .BuildCarrotMessageAsync(command, replyEndPoint, context, correlationId, cancellationToken)
             .ConfigureAwait(false);
 
