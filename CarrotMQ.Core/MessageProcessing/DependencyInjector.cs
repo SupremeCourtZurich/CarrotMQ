@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using CarrotMQ.Core.Dto.Internals;
 using CarrotMQ.Core.Handlers;
 using CarrotMQ.Core.MessageProcessing.Middleware;
-using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 

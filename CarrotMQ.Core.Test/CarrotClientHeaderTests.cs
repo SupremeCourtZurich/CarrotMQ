@@ -1,6 +1,7 @@
 ﻿using CarrotMQ.Core.Dto;
 using CarrotMQ.Core.EndPoints;
 using CarrotMQ.Core.MessageProcessing;
+using CarrotMQ.Core.MessageSending;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 using CarrotMQ.Core.Test.Helper;
@@ -17,16 +18,16 @@ public class CarrotClientHeaderTests
     private readonly IEvent<TestDto, TestExchangeEndPoint> _eventDto = new TestDto(1);
     private readonly IQuery<TestDto, TestResponse, TestQueueEndPoint> _queryDto = new TestDto(1);
 
-    private ICarrotClient _carrotClient = default!;
-    private IDependencyInjector _dependencyInjector = default!;
-    private CarrotMessage _resultingMessage = default!;
-    private ITransport _transport = default!;
+    private ICarrotClient _carrotClient = null!;
+    private IDependencyInjector _dependencyInjector = null!;
+    private CarrotMessage _resultingMessage = null!;
+    private ITransport _transport = null!;
 
     [TestInitialize]
     public void Initialize()
     {
         _transport = Substitute.For<ITransport>();
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(
                 x =>
                 {
@@ -34,7 +35,7 @@ public class CarrotClientHeaderTests
 
                     return Task.FromResult(new CarrotMessage());
                 });
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), default)
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(
                 x =>
                 {
@@ -46,11 +47,8 @@ public class CarrotClientHeaderTests
         _dependencyInjector = Substitute.For<IDependencyInjector>();
         _dependencyInjector.CreateAsyncScope().Returns(_ => _dependencyInjector);
         var serializer = new DefaultCarrotSerializer();
-        _carrotClient = new CarrotClient(
-            [],
-            _transport,
-            new DefaultRoutingKeyResolver(),
-            serializer);
+        var messageBuilder = new CarrotMessageBuilder([], serializer, new DefaultRoutingKeyResolver());
+        _carrotClient = new CarrotClient(_transport, serializer, messageBuilder);
     }
 
     [TestCleanup]

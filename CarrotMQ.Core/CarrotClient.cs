@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Dto;
 using CarrotMQ.Core.Dto.Internals;
 using CarrotMQ.Core.EndPoints;
-using CarrotMQ.Core.MessageProcessing;
+using CarrotMQ.Core.MessageSending;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 
@@ -19,28 +17,24 @@ namespace CarrotMQ.Core;
 /// </summary>
 public sealed class CarrotClient : ICarrotClient
 {
-    private readonly IEnumerable<IMessageEnricher> _messageEnrichers;
-    private readonly IRoutingKeyResolver _routingKeyResolver;
+    private readonly ICarrotMessageBuilder _messageBuilder;
     private readonly ICarrotSerializer _serializer;
     private readonly ITransport _transport;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CarrotClient" /> class.
     /// </summary>
-    /// <param name="messageEnrichers"></param>
     /// <param name="transport">The transport mechanism for message exchange.</param>
-    /// <param name="routingKeyResolver">The resolver for routing keys.</param>
     /// <param name="serializer">The serializer for message payloads.</param>
+    /// <param name="messageBuilder">The message builder used to convert typed messages into <see cref="CarrotMessage" />s</param>
     public CarrotClient(
-        IEnumerable<IMessageEnricher> messageEnrichers,
         ITransport transport,
-        IRoutingKeyResolver routingKeyResolver,
-        ICarrotSerializer serializer)
+        ICarrotSerializer serializer,
+        ICarrotMessageBuilder messageBuilder)
     {
-        _messageEnrichers = messageEnrichers;
         _transport = transport ?? throw new ArgumentNullException(nameof(transport));
-        _routingKeyResolver = routingKeyResolver ?? throw new ArgumentNullException(nameof(routingKeyResolver));
         _serializer = serializer ?? throw new ArgumentNullException(nameof(serializer));
+        _messageBuilder = messageBuilder ?? throw new ArgumentNullException(nameof(messageBuilder));
     }
 
     /// <inheritdoc />
@@ -50,7 +44,8 @@ public sealed class CarrotClient : ICarrotClient
         CancellationToken cancellationToken = default)
         where TEvent : ICustomRoutingEvent<TEvent>
     {
-        var message = await BuildCarrotMessageAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
             .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
@@ -64,7 +59,9 @@ public sealed class CarrotClient : ICarrotClient
         where TEvent : IEvent<TEvent, TExchangeEndPoint>
         where TExchangeEndPoint : ExchangeEndPoint, new()
     {
-        var message = await BuildCarrotMessageAsync(@event, new NoReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(@event, context, cancellationToken)
+            .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
     }
@@ -78,7 +75,9 @@ public sealed class CarrotClient : ICarrotClient
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await BuildSendReceiveMessageAsync(command, context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(command, context, cancellationToken)
+            .ConfigureAwait(false);
 
         return await SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(message, cancellationToken)
             .ConfigureAwait(false);
@@ -93,7 +92,9 @@ public sealed class CarrotClient : ICarrotClient
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await BuildSendReceiveMessageAsync(query, context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(query, context, cancellationToken)
+            .ConfigureAwait(false);
 
         return await SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(message, cancellationToken)
             .ConfigureAwait(false);
@@ -110,9 +111,9 @@ public sealed class CarrotClient : ICarrotClient
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await BuildCarrotMessageAsync(command, replyEndPoint ?? new NoReplyEndPoint(), context, cancellationToken)
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(command, replyEndPoint, context, correlationId, cancellationToken)
             .ConfigureAwait(false);
-        message.Header.CorrelationId = correlationId;
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
     }
@@ -128,88 +129,11 @@ public sealed class CarrotClient : ICarrotClient
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        var message = await BuildCarrotMessageAsync(query, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
-        message.Header.CorrelationId = correlationId;
+        CarrotMessage message = await _messageBuilder
+            .BuildCarrotMessageAsync(query, replyEndPoint, context, correlationId, cancellationToken)
+            .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<CarrotMessage> BuildSendReceiveMessageAsync<TRequest, TResponse, TEndPointDefinition>(
-        _IRequest<TRequest, TResponse, TEndPointDefinition> request,
-        Context? context,
-        CancellationToken cancellationToken)
-        where TResponse : class
-        where TRequest : _IRequest<TRequest, TResponse, TEndPointDefinition>
-        where TEndPointDefinition : EndPointBase, new()
-    {
-        var message = await BuildCarrotMessageAsync(request, new DirectReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
-        message.Header.CorrelationId = Guid.NewGuid();
-        if (message.Header.MessageProperties.Ttl == null)
-        {
-            var messageProperties = message.Header.MessageProperties;
-            messageProperties.Ttl = 5_000;
-            message.Header.MessageProperties = messageProperties;
-        }
-
-        return message;
-    }
-
-    private Task<CarrotMessage> BuildCarrotMessageAsync<TRequest, TResponse, TEndPointDefinition>(
-        _IMessage<TRequest, TResponse, TEndPointDefinition> request,
-        ReplyEndPointBase replyEndPoint,
-        Context? context,
-        CancellationToken cancellationToken)
-        where TResponse : class
-        where TRequest : _IMessage<TRequest, TResponse, TEndPointDefinition>
-        where TEndPointDefinition : EndPointBase, new()
-    {
-        var requestEndPoint = new TEndPointDefinition();
-        var exchange = requestEndPoint.Exchange;
-        var routingKey = requestEndPoint.GetRoutingKey<TRequest>(_routingKeyResolver);
-
-        return BuildCarrotMessageAsync(request, exchange, routingKey, replyEndPoint, context, cancellationToken);
-    }
-
-    private async Task<CarrotMessage> BuildCarrotMessageAsync<TRequest, TResponse>(
-        _IMessage<TRequest, TResponse> request,
-        string exchange,
-        string routingKey,
-        ReplyEndPointBase replyEndPoint,
-        Context? context,
-        CancellationToken cancellationToken)
-        where TResponse : class
-        where TRequest : _IMessage<TRequest, TResponse>
-    {
-        var ctx = context ?? new Context();
-
-        foreach (var enricher in _messageEnrichers)
-        {
-            await enricher.EnrichMessageAsync(request, ctx, cancellationToken).ConfigureAwait(false);
-        }
-
-        var header = new CarrotHeader
-        {
-            MessageId = Guid.NewGuid(),
-            CalledMethod = request.GetType().FullName
-                ?? throw new ArgumentException($"Can not get FullName of type {nameof(request)}", nameof(request)),
-            Exchange = exchange,
-            RoutingKey = routingKey,
-            InitialUserName = ctx.InitialUserName,
-            InitialServiceName = ctx.InitialServiceName,
-            MessageProperties = ctx.MessageProperties,
-            CustomHeader = ctx.CustomHeader.ToDictionary(
-                entry => entry.Key,
-                entry => entry.Value),
-            ReplyExchange = replyEndPoint.Exchange,
-            ReplyRoutingKey = replyEndPoint.RoutingKey,
-            IncludeRequestPayloadInResponse = replyEndPoint.IncludeRequestPayloadInResponse
-        };
-
-        var messagePayload = _serializer.Serialize(request);
-
-        var message = new CarrotMessage(header, messagePayload);
-
-        return message;
     }
 
     private async Task<CarrotResponse<TRequest, TResponse>> SendReceiveAsync<TRequest, TResponse, TEndPointDefinition>(

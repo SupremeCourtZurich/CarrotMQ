@@ -2,7 +2,6 @@
 using CarrotMQ.Core.Dto.Internals;
 using CarrotMQ.Core.Handlers;
 using CarrotMQ.Core.MessageProcessing.Middleware;
-using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 
 namespace CarrotMQ.Core.MessageProcessing;

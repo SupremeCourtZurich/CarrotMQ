@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using CarrotMQ.Core.MessageProcessing;
 using CarrotMQ.Core.MessageProcessing.Middleware;
+using CarrotMQ.Core.MessageSending;
 using CarrotMQ.Core.Serialization;
 using CarrotMQ.Core.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IResponseSender, ResponseSender>();
         services.AddSingleton<ICarrotMetricsRecorder, CarrotMetricsRecorder>();
 
+        services.TryAddTransient<ICarrotMessageBuilder, CarrotMessageBuilder>();
         services.TryAddScoped<IMiddlewareProcessor, MiddlewareProcessor>();
         services.TryAddSingleton<ICarrotSerializer, DefaultCarrotSerializer>();
         services.TryAddSingleton<IDependencyInjector, DependencyInjector>();
