@@ -39,15 +39,13 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         return message;
     }
 
-    public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(
-        ICustomRoutingEvent<TEvent> @event,
-        string exchange,
-        string routingKey,
-        ReplyEndPointBase replyEndPoint,
-        Context? context,
+    public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(ICustomRoutingEvent<TEvent> @event, Context? context,
         CancellationToken cancellationToken) where TEvent : ICustomRoutingEvent<TEvent>
     {
-        return await BuildCarrotMessageInternalAsync(@event, exchange, routingKey, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
+            .ConfigureAwait(false);
+
+        return message;
     }
 
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
