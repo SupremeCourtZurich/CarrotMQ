@@ -32,6 +32,12 @@ public interface ICarrotMessageBuilder
         where TEvent : ICustomRoutingEvent<TEvent>;
 
     /// <inheritdoc cref="ICarrotMessageBuilder"/>
+    public Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(
+        ICustomRoutingEvent<TEvent> @event,
+        Context? context,
+        CancellationToken cancellationToken) where TEvent : ICustomRoutingEvent<TEvent>;
+
+    /// <inheritdoc cref="ICarrotMessageBuilder"/>
     public Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint,

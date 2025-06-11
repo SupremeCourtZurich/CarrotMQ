@@ -45,7 +45,7 @@ public sealed class CarrotClient : ICarrotClient
         where TEvent : ICustomRoutingEvent<TEvent>
     {
         CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
+            .BuildCarrotMessageAsync(@event, context, cancellationToken)
             .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);

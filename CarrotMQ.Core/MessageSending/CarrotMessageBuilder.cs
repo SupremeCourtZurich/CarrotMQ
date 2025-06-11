@@ -50,6 +50,15 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         return await BuildCarrotMessageInternalAsync(@event, exchange, routingKey, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(ICustomRoutingEvent<TEvent> @event, Context? context,
+        CancellationToken cancellationToken) where TEvent : ICustomRoutingEvent<TEvent>
+    {
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
+            .ConfigureAwait(false);
+
+        return message;
+    }
+
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint,
