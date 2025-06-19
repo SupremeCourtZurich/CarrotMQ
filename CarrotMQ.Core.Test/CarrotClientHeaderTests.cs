@@ -62,7 +62,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.PublishAsync(_eventDto);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -79,7 +79,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.PublishAsync(_eventDto, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -96,7 +96,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.PublishAsync(_eventDto, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -113,7 +113,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.PublishAsync(_eventDto, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.AreEqual(ServiceName, resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -128,7 +128,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { PublisherConfirm = false });
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -145,7 +145,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Ttl = ttl });
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -160,7 +160,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Priority = 2 });
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -175,7 +175,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Persistent = true });
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
@@ -193,7 +193,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.PublishAsync(dto, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.AreEqual(typeof(CustomRoutingKeyDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
         Assert.AreEqual(CustomRoutingKeyDto.CustomExchange, resultHeader.Exchange, nameof(resultHeader.Exchange));
@@ -214,7 +214,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_queryDto, replyEndpoint, context, correlationId: correlationId);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.AreEqual(typeof(TestDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
         Assert.AreEqual(string.Empty, resultHeader.Exchange, nameof(resultHeader.Exchange));
@@ -235,7 +235,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_commandDto, replyEndpoint, context, correlationId: correlationId);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.AreEqual(typeof(TestDto).FullName, resultHeader.CalledMethod, nameof(resultHeader.CalledMethod));
         Assert.AreEqual(string.Empty, resultHeader.Exchange, nameof(resultHeader.Exchange));
@@ -255,7 +255,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_queryDto, replyEndpoint, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.IsNull(resultHeader.CorrelationId, nameof(resultHeader.CorrelationId));
     }
 
@@ -266,7 +266,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_commandDto, context: context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.IsNull(resultHeader.CorrelationId, nameof(resultHeader.CorrelationId));
     }
 
@@ -277,7 +277,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_commandDto, context: context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(string.Empty, resultHeader.ReplyExchange, nameof(resultHeader.ReplyExchange));
         Assert.AreEqual(string.Empty, resultHeader.ReplyRoutingKey, nameof(resultHeader.ReplyRoutingKey));
     }
@@ -293,7 +293,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendAsync(_queryDto, replyEndpoint);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(includePayload, resultHeader.IncludeRequestPayloadInResponse, nameof(resultHeader.IncludeRequestPayloadInResponse));
     }
 
@@ -304,7 +304,7 @@ public class CarrotClientHeaderTests
 
         await _carrotClient.SendReceiveAsync(_commandDto, context);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(5_000, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
     }
 
@@ -313,7 +313,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.SendReceiveAsync(_commandDto);
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(5_000, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
     }
 
@@ -324,7 +324,7 @@ public class CarrotClientHeaderTests
     {
         await _carrotClient.SendReceiveAsync(_commandDto, messageProperties: new MessageProperties { Ttl = ttl });
 
-        CarrotHeader resultHeader = _resultingMessage.Header;
+        var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(ttl, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
     }
 

@@ -84,8 +84,8 @@ public interface ICarrotClient
     /// <param name="command">The command instance to be sent.</param>
     /// <param name="context">The optional context for the operation.</param>
     /// <param name="messageProperties">
-    /// The optional MessageProperties. If not specified <see cref="MessageProperties.Default" /> is used and TTL set to
-    /// 5000.
+    /// The optional MessageProperties.
+    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
     /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the command.</returns>
@@ -118,7 +118,10 @@ public interface ICarrotClient
     /// <typeparam name="TEndPointDefinition">The type of the endpoint definition associated with the query.</typeparam>
     /// <param name="query">The query instance to be sent.</param>
     /// <param name="context">The optional context for the operation.</param>
-    /// <param name="messageProperties">The optional MessageProperties. If not specified <see cref="MessageProperties.Default" /> is used.</param>
+    /// <param name="messageProperties">
+    /// The optional MessageProperties.
+    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
+    /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the query.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided query has invalid properties.</exception>
