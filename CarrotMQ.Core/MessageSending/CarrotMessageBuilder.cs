@@ -31,18 +31,30 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent, TExchangeEndPoint>(
         IEvent<TEvent, TExchangeEndPoint> @event,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken) where TEvent : IEvent<TEvent, TExchangeEndPoint>
         where TExchangeEndPoint : ExchangeEndPoint, new()
     {
-        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, new NoReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, new NoReplyEndPoint(), context, messageProperties, cancellationToken)
+            .ConfigureAwait(false);
 
         return message;
     }
 
-    public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(ICustomRoutingEvent<TEvent> @event, Context? context,
+    public async Task<CarrotMessage> BuildCarrotMessageAsync<TEvent>(
+        ICustomRoutingEvent<TEvent> @event,
+        Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken) where TEvent : ICustomRoutingEvent<TEvent>
     {
-        CarrotMessage message = await BuildCarrotMessageInternalAsync(@event, @event.Exchange, @event.RoutingKey, new NoReplyEndPoint(), context, cancellationToken)
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(
+                @event,
+                @event.Exchange,
+                @event.RoutingKey,
+                new NoReplyEndPoint(),
+                context,
+                messageProperties,
+                cancellationToken)
             .ConfigureAwait(false);
 
         return message;
@@ -52,13 +64,19 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint,
         Context? context,
+        MessageProperties? messageProperties,
         Guid? correlationId,
         CancellationToken cancellationToken)
         where TResponse : class
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageInternalAsync(command, replyEndPoint ?? new NoReplyEndPoint(), context, cancellationToken)
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(
+                command,
+                replyEndPoint ?? new NoReplyEndPoint(),
+                context,
+                messageProperties,
+                cancellationToken)
             .ConfigureAwait(false);
         message.Header.CorrelationId = correlationId;
 
@@ -68,24 +86,27 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> request,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken) where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TResponse : class
         where TEndPointDefinition : EndPointBase, new()
     {
-        return await BuildCarrotMessageInternalAsync(request, context, cancellationToken).ConfigureAwait(false);
+        return await BuildCarrotMessageInternalAsync(request, context, messageProperties, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
         ReplyEndPointBase replyEndPoint,
         Context? context,
+        MessageProperties? messageProperties,
         Guid? correlationId,
         CancellationToken cancellationToken)
         where TResponse : class
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageInternalAsync(query, replyEndPoint, context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message = await BuildCarrotMessageInternalAsync(query, replyEndPoint, context, messageProperties, cancellationToken)
+            .ConfigureAwait(false);
         message.Header.CorrelationId = correlationId;
 
         return message;
@@ -94,29 +115,27 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
     public async Task<CarrotMessage> BuildCarrotMessageAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> request,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken) where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TResponse : class
         where TEndPointDefinition : EndPointBase, new()
     {
-        return await BuildCarrotMessageInternalAsync(request, context, cancellationToken).ConfigureAwait(false);
+        return await BuildCarrotMessageInternalAsync(request, context, messageProperties, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<CarrotMessage> BuildCarrotMessageInternalAsync<TRequest, TResponse, TEndPointDefinition>(
         _IRequest<TRequest, TResponse, TEndPointDefinition> request,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken)
         where TResponse : class
         where TRequest : _IRequest<TRequest, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await BuildCarrotMessageInternalAsync(request, new DirectReplyEndPoint(), context, cancellationToken).ConfigureAwait(false);
+        CarrotMessage message =
+            await BuildCarrotMessageInternalAsync(request, new DirectReplyEndPoint(), context, messageProperties, cancellationToken)
+                .ConfigureAwait(false);
         message.Header.CorrelationId = Guid.NewGuid();
-        if (message.Header.MessageProperties.Ttl == null)
-        {
-            MessageProperties messageProperties = message.Header.MessageProperties;
-            messageProperties.Ttl = 5_000;
-            message.Header.MessageProperties = messageProperties;
-        }
 
         return message;
     }
@@ -125,6 +144,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         _IMessage<TRequest, TResponse, TEndPointDefinition> request,
         ReplyEndPointBase replyEndPoint,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken)
         where TResponse : class
         where TRequest : _IMessage<TRequest, TResponse, TEndPointDefinition>
@@ -134,7 +154,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         string exchange = requestEndPoint.Exchange;
         string routingKey = requestEndPoint.GetRoutingKey<TRequest>(_routingKeyResolver);
 
-        return BuildCarrotMessageInternalAsync(request, exchange, routingKey, replyEndPoint, context, cancellationToken);
+        return BuildCarrotMessageInternalAsync(request, exchange, routingKey, replyEndPoint, context, messageProperties, cancellationToken);
     }
 
     private async Task<CarrotMessage> BuildCarrotMessageInternalAsync<TRequest, TResponse>(
@@ -143,6 +163,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
         string routingKey,
         ReplyEndPointBase replyEndPoint,
         Context? context,
+        MessageProperties? messageProperties,
         CancellationToken cancellationToken)
         where TResponse : class
         where TRequest : _IMessage<TRequest, TResponse>
@@ -163,7 +184,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
             RoutingKey = routingKey,
             InitialUserName = ctx.InitialUserName,
             InitialServiceName = ctx.InitialServiceName,
-            MessageProperties = ctx.MessageProperties,
+            MessageProperties = messageProperties ?? MessageProperties.Default,
             CustomHeader = ctx.CustomHeader.ToDictionary(
                 entry => entry.Key,
                 entry => entry.Value),

@@ -14,8 +14,8 @@ public sealed class ConsumerContext : Context
     /// </summary>
     /// <param name="initialUserName">See <see cref="Context.InitialUserName" />.</param>
     /// <param name="initialServiceName">See <see cref="Context.InitialServiceName" />.</param>
-    /// <param name="messageProperties">See <see cref="Context.MessageProperties" />.</param>
     /// <param name="customHeader">See <see cref="Context.CustomHeader" />.</param>
+    /// <param name="messageProperties">See <see cref="MessageProperties" />.</param>
     /// <param name="messageId">See <see cref="MessageId" />.</param>
     /// <param name="correlationId">See <see cref="CorrelationId" />.</param>
     /// <param name="createdAt">See <see cref="CreatedAt" />.</param>
@@ -26,12 +26,18 @@ public sealed class ConsumerContext : Context
         IDictionary<string, string>? customHeader,
         Guid messageId,
         Guid? correlationId,
-        DateTimeOffset createdAt) : base(initialUserName, initialServiceName, messageProperties, customHeader)
+        DateTimeOffset createdAt) : base(initialUserName, initialServiceName, customHeader)
     {
+        MessageProperties = messageProperties;
         MessageId = messageId;
         CorrelationId = correlationId;
         CreatedAt = createdAt;
     }
+
+    /// <summary>
+    /// Gets the message properties. The default is <see cref="MessageProperties.Default" />
+    /// </summary>
+    public MessageProperties MessageProperties { get; }
 
     /// <summary>
     /// Gets the unique message id.

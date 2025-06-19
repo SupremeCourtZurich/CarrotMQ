@@ -105,7 +105,7 @@ public class QueueEndPointDirectReplyCmdTest : TestBaseDirectReply
                 TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
                 WaitDurationCount = 2
             },
-            new Context(600));
+            messageProperties: new MessageProperties { Ttl = 600 });
 
         await VerifyOperationCanceled(id, sendTask);
     }
