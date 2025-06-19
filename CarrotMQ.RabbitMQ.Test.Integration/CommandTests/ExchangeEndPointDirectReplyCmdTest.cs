@@ -18,9 +18,9 @@ public class ExchangeEndPointDirectReplyCmdTest : TestBaseDirectReply
     {
         const int id = 1001;
 
-        var context = new Context(messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
-
-        var response = await CarrotClient.SendReceiveAsync(new ExchangeEndPointCmd(id), context);
+        var response = await CarrotClient.SendReceiveAsync(
+            new ExchangeEndPointCmd(id),
+            messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
 
         await VerifyOk(id, response, response.Content?.Id);
     }
@@ -109,7 +109,7 @@ public class ExchangeEndPointDirectReplyCmdTest : TestBaseDirectReply
                 TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
                 WaitDurationCount = 2
             },
-            new Context(600));
+            messageProperties: new MessageProperties { Ttl = 600 });
 
         await VerifyOperationCanceled(id, sendTask);
     }

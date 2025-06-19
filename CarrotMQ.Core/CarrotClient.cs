@@ -41,12 +41,11 @@ public sealed class CarrotClient : ICarrotClient
     public async Task PublishAsync<TEvent>(
         ICustomRoutingEvent<TEvent> @event,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TEvent : ICustomRoutingEvent<TEvent>
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(@event, context, cancellationToken)
-            .ConfigureAwait(false);
+        var message = await _messageBuilder.BuildCarrotMessageAsync(@event, context, messageProperties, cancellationToken).ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
     }
@@ -55,13 +54,12 @@ public sealed class CarrotClient : ICarrotClient
     public async Task PublishAsync<TEvent, TExchangeEndPoint>(
         IEvent<TEvent, TExchangeEndPoint> @event,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TEvent : IEvent<TEvent, TExchangeEndPoint>
         where TExchangeEndPoint : ExchangeEndPoint, new()
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(@event, context, cancellationToken)
-            .ConfigureAwait(false);
+        var message = await _messageBuilder.BuildCarrotMessageAsync(@event, context, messageProperties, cancellationToken).ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
     }
@@ -70,34 +68,30 @@ public sealed class CarrotClient : ICarrotClient
     public async Task<CarrotResponse<TCommand, TResponse>> SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(command, context, cancellationToken)
-            .ConfigureAwait(false);
+        var message = await _messageBuilder.BuildCarrotMessageAsync(command, context, messageProperties, cancellationToken).ConfigureAwait(false);
 
-        return await SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(message, cancellationToken)
-            .ConfigureAwait(false);
+        return await SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(message, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<CarrotResponse<TQuery, TResponse>> SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(query, context, cancellationToken)
-            .ConfigureAwait(false);
+        var message = await _messageBuilder.BuildCarrotMessageAsync(query, context, messageProperties, cancellationToken).ConfigureAwait(false);
 
-        return await SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(message, cancellationToken)
-            .ConfigureAwait(false);
+        return await SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(message, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -105,14 +99,15 @@ public sealed class CarrotClient : ICarrotClient
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint = null,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         Guid? correlationId = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(command, replyEndPoint, context, correlationId, cancellationToken)
+        var message = await _messageBuilder
+            .BuildCarrotMessageAsync(command, replyEndPoint, context, messageProperties, correlationId, cancellationToken)
             .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
@@ -123,14 +118,15 @@ public sealed class CarrotClient : ICarrotClient
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
         ReplyEndPointBase replyEndPoint,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         Guid? correlationId = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
-        CarrotMessage message = await _messageBuilder
-            .BuildCarrotMessageAsync(query, replyEndPoint, context, correlationId, cancellationToken)
+        var message = await _messageBuilder
+            .BuildCarrotMessageAsync(query, replyEndPoint, context, messageProperties, correlationId, cancellationToken)
             .ConfigureAwait(false);
 
         await SendAsync(message, cancellationToken).ConfigureAwait(false);
@@ -143,6 +139,13 @@ public sealed class CarrotClient : ICarrotClient
         where TRequest : _IRequest<TRequest, TResponse, TEndPointDefinition>
         where TEndPointDefinition : EndPointBase, new()
     {
+        if (message.Header.MessageProperties.Ttl is null)
+        {
+            MessageProperties msgProps = message.Header.MessageProperties;
+            msgProps.Ttl = 5_000;
+            message.Header.MessageProperties = msgProps;
+        }
+
         CarrotMessage responseMessage;
         if (message.Header.MessageProperties.Ttl > 0)
         {

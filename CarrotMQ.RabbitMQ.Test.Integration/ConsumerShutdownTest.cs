@@ -26,7 +26,7 @@ public class ConsumerShutdownTest
         // Send message 1 (this message should reach ConsumerShutdownQueryHandler1 on host1)
         var sendTask1 = TestBase.CarrotClient.SendReceiveAsync(
             new ConsumerShutdownQuery { Data = $"{nameof(ConsumerShutdownTest)}_1" },
-            new Context(10000));
+            messageProperties: new MessageProperties { Ttl = 10000 });
 
         var semaphoreInjection = host1.Host.Services.GetRequiredService<ConsumerShutdownQueryHandler1.SemaphoreInjector>();
 
@@ -49,13 +49,13 @@ public class ConsumerShutdownTest
         await Task.Delay(500); // Delay to make sure the consumer on host1 has been canceled on the broker
         var r2 = await TestBase.CarrotClient.SendReceiveAsync(
             new ConsumerShutdownQuery { Data = $"{nameof(ConsumerShutdownTest)}_2" },
-            new Context(10000));
+            messageProperties: new MessageProperties { Ttl = 10000 });
         var r3 = await TestBase.CarrotClient.SendReceiveAsync(
             new ConsumerShutdownQuery { Data = $"{nameof(ConsumerShutdownTest)}_3" },
-            new Context(10000));
+            messageProperties: new MessageProperties { Ttl = 10000 });
         var r4 = await TestBase.CarrotClient.SendReceiveAsync(
             new ConsumerShutdownQuery { Data = $"{nameof(ConsumerShutdownTest)}_4" },
-            new Context(10000));
+            messageProperties: new MessageProperties { Ttl = 10000 });
 
         // Allow message 1 to finish 
         semaphoreInjection.AllowHandlerToComplete.Release();

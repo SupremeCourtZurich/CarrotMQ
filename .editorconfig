@@ -1,20 +1,9 @@
+
+# All files
 [*]
 indent_size = 4
 indent_style = space
 tab_width = 4
-
-MA0048.only_validate_first_type = true
-dotnet_diagnostic.MA0008.severity = none
-dotnet_diagnostic.MA0012.severity = none
-dotnet_diagnostic.MA0091.severity = suggestion
-dotnet_diagnostic.MA0002.severity = suggestion
-dotnet_diagnostic.MA0051.severity = suggestion
-dotnet_diagnostic.MA0011.severity = suggestion
-dotnet_diagnostic.MA0046.severity = none
-dotnet_diagnostic.MA0132.severity = none
-MA0051.maximum_lines_per_method = 60
-MA0051.maximum_statements_per_method = 40
-MA0051.skip_local_functions = false # skip local functions when counting statements
 
 csharp_indent_braces = false
 csharp_indent_labels = no_change
@@ -456,8 +445,8 @@ dotnet_style_qualification_for_property = false:warning
 dotnet_style_readonly_field = true:suggestion
 dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 end_of_line = crlf
-file_header_template = # ReSharper properties
 insert_final_newline = false
+# ReSharper properties
 resharper_access_rights_in_text_highlighting = warning
 resharper_access_to_disposed_closure_highlighting = warning
 resharper_access_to_for_each_variable_in_closure_highlighting = warning
@@ -1512,10 +1501,10 @@ resharper_structured_message_template_problem_highlighting = warning
 resharper_suggest_base_type_for_parameter_highlighting = hint
 resharper_suggest_base_type_for_parameter_in_constructor_highlighting = hint
 resharper_suggest_discard_declaration_var_style_highlighting = hint
-resharper_suggest_var_or_type_built_in_types_highlighting = hint
-resharper_suggest_var_or_type_deconstruction_declarations_highlighting = hint
-resharper_suggest_var_or_type_elsewhere_highlighting = hint
-resharper_suggest_var_or_type_simple_types_highlighting = hint
+resharper_suggest_var_or_type_built_in_types_highlighting = none
+resharper_suggest_var_or_type_deconstruction_declarations_highlighting = none
+resharper_suggest_var_or_type_elsewhere_highlighting = none
+resharper_suggest_var_or_type_simple_types_highlighting = none
 resharper_support_vs_event_naming_pattern = true
 resharper_suppress_nullable_warning_expression_as_inverted_is_expression_highlighting = warning
 resharper_suspicious_lock_over_synchronization_primitive_highlighting = warning
@@ -1874,3 +1863,12 @@ resharper_xmldoc_wrap_tags_and_pi = true
 resharper_xmldoc_wrap_text = true
 resharper_xunit_xunit_test_with_console_output_highlighting = warning
 resharper_zero_index_from_end_highlighting = warning
+
+# Generated files
+[*.{g.cs,Designer.cs}]
+dotnet_diagnostic.cs1591.severity = none
+
+# YAML Files
+[*.{yml,yaml}]
+indent_size = 2
+tab_width = 2

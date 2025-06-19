@@ -23,6 +23,7 @@ public interface ICarrotClient
     /// <typeparam name="TEvent">The type of the event to be published.</typeparam>
     /// <param name="event">The event instance to be published.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">The optional MessageProperties.</param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided event has invalid properties.</exception>
@@ -38,6 +39,7 @@ public interface ICarrotClient
     Task PublishAsync<TEvent>(
         ICustomRoutingEvent<TEvent> @event,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TEvent : ICustomRoutingEvent<TEvent>;
 
@@ -50,6 +52,7 @@ public interface ICarrotClient
     /// <typeparam name="TExchangeEndPoint">The type of the exchange endpoint associated with the event.</typeparam>
     /// <param name="event">The event instance to be published.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">The optional MessageProperties. If not specified <see cref="MessageProperties.Default" /> is used.</param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided event has invalid properties.</exception>
@@ -65,6 +68,7 @@ public interface ICarrotClient
     Task PublishAsync<TEvent, TExchangeEndPoint>(
         IEvent<TEvent, TExchangeEndPoint> @event,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TEvent : IEvent<TEvent, TExchangeEndPoint>
         where TExchangeEndPoint : ExchangeEndPoint, new();
@@ -79,6 +83,10 @@ public interface ICarrotClient
     /// <typeparam name="TEndPointDefinition">The type of the endpoint definition associated with the command.</typeparam>
     /// <param name="command">The command instance to be sent.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">
+    /// The optional MessageProperties.
+    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
+    /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the command.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided command has invalid properties.</exception>
@@ -94,6 +102,7 @@ public interface ICarrotClient
     Task<CarrotResponse<TCommand, TResponse>> SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TCommand : ICommand<TCommand, TResponse, TEndPointDefinition>
@@ -109,6 +118,10 @@ public interface ICarrotClient
     /// <typeparam name="TEndPointDefinition">The type of the endpoint definition associated with the query.</typeparam>
     /// <param name="query">The query instance to be sent.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">
+    /// The optional MessageProperties.
+    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
+    /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the query.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided query has invalid properties.</exception>
@@ -124,6 +137,7 @@ public interface ICarrotClient
     Task<CarrotResponse<TQuery, TResponse>> SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
         where TQuery : IQuery<TQuery, TResponse, TEndPointDefinition>
@@ -141,6 +155,7 @@ public interface ICarrotClient
     /// <param name="command">The command instance to be sent.</param>
     /// <param name="replyEndPoint">The optional reply endpoint for the command.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">The optional MessageProperties. If not specified <see cref="MessageProperties.Default" /> is used.</param>
     /// <param name="correlationId">The optional correlation ID for the operation.</param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
@@ -158,6 +173,7 @@ public interface ICarrotClient
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
         ReplyEndPointBase? replyEndPoint = null,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         Guid? correlationId = null,
         CancellationToken cancellationToken = default)
         where TResponse : class
@@ -176,6 +192,7 @@ public interface ICarrotClient
     /// <param name="query">The query instance to be sent.</param>
     /// <param name="replyEndPoint">The reply endpoint for the query.</param>
     /// <param name="context">The optional context for the operation.</param>
+    /// <param name="messageProperties">The optional MessageProperties. If not specified <see cref="MessageProperties.Default" /> is used.</param>
     /// <param name="correlationId">The optional correlation ID for the operation.</param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
@@ -193,6 +210,7 @@ public interface ICarrotClient
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
         ReplyEndPointBase replyEndPoint,
         Context? context = null,
+        MessageProperties? messageProperties = null,
         Guid? correlationId = null,
         CancellationToken cancellationToken = default)
         where TResponse : class

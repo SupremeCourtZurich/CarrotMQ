@@ -52,8 +52,7 @@ public class CarrotClientResponseTests
                 });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        var context = new Context(1);
-        await _carrotClient.SendReceiveAsync(request, context);
+        await _carrotClient.SendReceiveAsync(request, messageProperties: new MessageProperties { Ttl = 1 });
     }
 
     [TestMethod]
@@ -109,8 +108,7 @@ public class CarrotClientResponseTests
                 async callInfo => { await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false); });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        var context = new Context(1);
-        await _carrotClient.SendAsync(request, context: context);
+        await _carrotClient.SendAsync(request, messageProperties: new MessageProperties { Ttl = 1 });
     }
 
     [TestMethod]

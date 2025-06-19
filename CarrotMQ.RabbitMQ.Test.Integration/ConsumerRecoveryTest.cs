@@ -24,7 +24,7 @@ public class ConsumerRecoveryTest
         await host1.WaitForConsumerHostBootstrapToCompleteAsync();
 
         // Send message (check that everything is initialized)
-        await TestBase.CarrotClient.SendReceiveAsync(new ConsumerRecoveryQuery(), new Context(1000));
+        await TestBase.CarrotClient.SendReceiveAsync(new ConsumerRecoveryQuery(), messageProperties: new MessageProperties { Ttl = 1000 });
 
         // Delete queue on which we are consuming --> Consumer should be recovered automatically
         var connection = host1.Host.Services.GetRequiredService<IBrokerConnection>();
@@ -39,7 +39,10 @@ public class ConsumerRecoveryTest
         {
             try
             {
-                r2 = await TestBase.CarrotClient.SendReceiveAsync(new ConsumerRecoveryQuery(), new Context(1000), cts.Token);
+                r2 = await TestBase.CarrotClient.SendReceiveAsync(
+                    new ConsumerRecoveryQuery(),
+                    messageProperties: new MessageProperties { Ttl = 1000 },
+                    cancellationToken: cts.Token);
             }
             catch (Exception)
             {

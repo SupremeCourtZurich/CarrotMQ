@@ -18,9 +18,9 @@ public class ExchangeEndPointGenericResponseCmdTest : TestBaseDirectReply
     {
         const int id = 1001;
 
-        var context = new Context(messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
-
-        var response = await CarrotClient.SendReceiveAsync(new ExchangeEndPointGenericResponseCmd(id), context);
+        var response = await CarrotClient.SendReceiveAsync(
+            new ExchangeEndPointGenericResponseCmd(id),
+            messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
 
         await VerifyOk(id, response, response.Content?.InnerResponse?.Id);
     }
