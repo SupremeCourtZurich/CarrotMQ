@@ -17,14 +17,12 @@ public class ExchangeEndPointExchangeReplyCmdTest : TestBaseAsyncReply
     [DataRow(false)]
     public async Task ExchangeEndPoint_ExchangeReply_OK(bool publisherConfirm)
     {
-        var context = new Context(messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
-
         const int id = 3001;
 
         await CarrotClient.SendAsync(
             new ExchangeEndPointCmd(id),
             new ExchangeReplyEndPoint(TestExchange.Name, ExchangeEndPointCmd.Response.GetRoutingKey()),
-            context);
+            messageProperties: new MessageProperties { PublisherConfirm = publisherConfirm });
 
         await VerifyOk(id);
     }

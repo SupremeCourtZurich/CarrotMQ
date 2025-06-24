@@ -126,9 +126,7 @@ public class CarrotClientHeaderTests
     [TestMethod]
     public async Task PublishWithoutConfirm()
     {
-        var context = new Context(messageProperties: new MessageProperties { PublisherConfirm = false });
-
-        await _carrotClient.PublishAsync(_eventDto, context);
+        await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { PublisherConfirm = false });
 
         var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
@@ -145,9 +143,7 @@ public class CarrotClientHeaderTests
     [TestMethod]
     public async Task PublishWithTtl(int ttl)
     {
-        var context = new Context(messageProperties: new MessageProperties { Ttl = ttl });
-
-        await _carrotClient.PublishAsync(_eventDto, context);
+        await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Ttl = ttl });
 
         var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
@@ -162,9 +158,7 @@ public class CarrotClientHeaderTests
     [TestMethod]
     public async Task PublishWithPriority()
     {
-        var context = new Context(messageProperties: new MessageProperties { Priority = 2 });
-
-        await _carrotClient.PublishAsync(_eventDto, context);
+        await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Priority = 2 });
 
         var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
@@ -179,9 +173,7 @@ public class CarrotClientHeaderTests
     [TestMethod]
     public async Task PublishWithPersistent()
     {
-        var context = new Context(messageProperties: new MessageProperties { Persistent = true });
-
-        await _carrotClient.PublishAsync(_eventDto, context);
+        await _carrotClient.PublishAsync(_eventDto, messageProperties: new MessageProperties { Persistent = true });
 
         var resultHeader = _resultingMessage.Header;
         AssertGeneralPublishCarrotHeaderProperties(resultHeader);
@@ -220,7 +212,7 @@ public class CarrotClientHeaderTests
         var replyEndpoint = new ExchangeReplyEndPoint(replyExchange, replyRoutingKey);
         var context = new Context(UserName);
 
-        await _carrotClient.SendAsync(_queryDto, replyEndpoint, context, correlationId);
+        await _carrotClient.SendAsync(_queryDto, replyEndpoint, context, correlationId: correlationId);
 
         var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
@@ -241,7 +233,7 @@ public class CarrotClientHeaderTests
         var replyEndpoint = new QueueReplyEndPoint(replyQueue);
         var context = new Context(UserName);
 
-        await _carrotClient.SendAsync(_commandDto, replyEndpoint, context, correlationId);
+        await _carrotClient.SendAsync(_commandDto, replyEndpoint, context, correlationId: correlationId);
 
         var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
@@ -330,9 +322,7 @@ public class CarrotClientHeaderTests
     [TestMethod]
     public async Task SendReceive_With_Custom_Ttl(int ttl)
     {
-        var context = new Context(ttl);
-
-        await _carrotClient.SendReceiveAsync(_commandDto, context);
+        await _carrotClient.SendReceiveAsync(_commandDto, messageProperties: new MessageProperties { Ttl = ttl });
 
         var resultHeader = _resultingMessage.Header;
         Assert.AreEqual(ttl, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
