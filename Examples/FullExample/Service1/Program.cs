@@ -39,7 +39,7 @@ internal class Program
             .WithMetrics(
                 metricsBuilder =>
                 {
-                    metricsBuilder.AddMeter("CarrotMQ.RabbitMQ.CarrotMeter");
+                    metricsBuilder.AddMeter(Names.CarrotMeterName);
                     metricsBuilder.AddRuntimeInstrumentation();
                 })
             .WithTracing(tracingBuilder => { tracingBuilder.AddSource(Names.CarrotActivitySourceName); })

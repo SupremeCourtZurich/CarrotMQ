@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CarrotMQ.RabbitMQ" Version="1.0.0-alpha.3" />
+    <PackageReference Include="CarrotMQ.RabbitMQ" Version="1.0.0-alpha.8" />
   </ItemGroup>
 
   <ItemGroup>
