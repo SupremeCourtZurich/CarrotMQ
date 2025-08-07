@@ -54,7 +54,7 @@ public class TestBase
         RabbitMqContainerAmqpPort = s_rabbitContainer.GetMappedPublicPort(5672);
         RabbitMqContainerHttpPort = s_rabbitContainer.GetMappedPublicPort(15672);
 
-        RabbitMqConnectionString = $"amqp://127.0.0.1:{RabbitMqContainerAmqpPort}";
+        RabbitMqConnectionString = $"amqp://{s_rabbitContainer.Hostname}:{RabbitMqContainerAmqpPort}";
         RabbitMqVhost = $"vhost-test-{Guid.NewGuid()}";
 
         var brokerConnectionOptions = ConfigureBroker();
