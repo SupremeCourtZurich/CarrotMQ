@@ -33,6 +33,7 @@ public sealed class EndPointTests
     [TestMethod]
     public void QueueEndPoint_With_ArgumentException(string queueName)
     {
+       
         EndPointBase _ = new TestQueueEndPoint(queueName);
     }
 
