@@ -16,7 +16,6 @@ public class DependencyInjectorTest
         TestTransport.AllDisposed.Clear();
     }
 
-
     [TestMethod]
     public async Task Disposable_Serializer_IsDisposed()
     {

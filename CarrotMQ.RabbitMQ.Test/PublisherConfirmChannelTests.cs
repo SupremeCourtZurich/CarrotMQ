@@ -4,7 +4,6 @@ using CarrotMQ.RabbitMQ.Configuration;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Serialization;
 using CarrotMQ.RabbitMQ.Test.Helper;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -52,13 +51,12 @@ public class PublisherConfirmChannelTests
 
         _connection = Substitute.For<IConnection>();
         _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>())
-            .Returns(
-                _ =>
-                {
-                    _channelDeliveryTagCounter = 0;
+            .Returns(_ =>
+            {
+                _channelDeliveryTagCounter = 0;
 
-                    return _channel;
-                });
+                return _channel;
+            });
 
         _dateTimeProvider = Substitute.For<IDateTimeProvider>();
         _dateTimeProvider.Now.Returns(_dateTimeNow);
@@ -183,7 +181,7 @@ public class PublisherConfirmChannelTests
 
         // 2) Cancel publish
         tokenSource.Cancel();
-        await Assert.ThrowsAsync <TaskCanceledException>(() => task).ConfigureAwait(false);
+        await Assert.ThrowsAsync<TaskCanceledException>(() => task).ConfigureAwait(false);
 
         // Nothing should be republished
         await RepublishAsync(1).ConfigureAwait(false);
@@ -259,14 +257,13 @@ public class PublisherConfirmChannelTests
 
         // 2) Try Publish 1 message
         using var publishEvent = new AutoResetEvent(false);
-        _channel.When(
-                m => m.BasicPublishAsync(
-                    Arg.Any<string>(),
-                    Arg.Any<string>(),
-                    Arg.Any<bool>(),
-                    Arg.Any<BasicProperties>(),
-                    Arg.Any<ReadOnlyMemory<byte>>(),
-                    Arg.Any<CancellationToken>()))
+        _channel.When(m => m.BasicPublishAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<BasicProperties>(),
+                Arg.Any<ReadOnlyMemory<byte>>(),
+                Arg.Any<CancellationToken>()))
             .Do(_ => { publishEvent.Set(); });
         var message = new CarrotMessage(new CarrotHeader(), string.Empty);
 
@@ -293,20 +290,18 @@ public class PublisherConfirmChannelTests
         var publishedCount = 0;
         using var allPublishedEvent = new AutoResetEvent(false);
 
-        _channel.When(
-                async m => await m.BasicPublishAsync(
-                        Arg.Any<string>(),
-                        Arg.Any<string>(),
-                        Arg.Any<bool>(),
-                        Arg.Any<BasicProperties>(),
-                        Arg.Any<ReadOnlyMemory<byte>>(),
-                        Arg.Any<CancellationToken>())
-                    .ConfigureAwait(false))
-            .Do(
-                _ =>
-                {
-                    if (Interlocked.Increment(ref publishedCount) == noOfMessages) allPublishedEvent.Set();
-                });
+        _channel.When(async m => await m.BasicPublishAsync(
+                    Arg.Any<string>(),
+                    Arg.Any<string>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<BasicProperties>(),
+                    Arg.Any<ReadOnlyMemory<byte>>(),
+                    Arg.Any<CancellationToken>())
+                .ConfigureAwait(false))
+            .Do(_ =>
+            {
+                if (Interlocked.Increment(ref publishedCount) == noOfMessages) allPublishedEvent.Set();
+            });
 
         for (var i = 0; i < noOfMessages; i++)
         {
@@ -343,16 +338,15 @@ public class PublisherConfirmChannelTests
 
         var isOpenCalledCounter = 0;
         _channel.IsOpen
-            .Returns(
-                _ =>
+            .Returns(_ =>
+            {
+                if (isOpenCalledCounter++ >= 2)
                 {
-                    if (isOpenCalledCounter++ >= 2)
-                    {
-                        resetEvent.Set();
-                    }
+                    resetEvent.Set();
+                }
 
-                    return false;
-                });
+                return false;
+            });
 
         _channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(
             null,

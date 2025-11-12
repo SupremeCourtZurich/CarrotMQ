@@ -267,18 +267,17 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
 
         if (UnregisteredAsync != null)
         {
-            _ = Task.Run(
-                async () =>
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    try
-                    {
-                        await UnregisteredAsync.InvokeAllAsync(this, EventArgs.Empty).ConfigureAwait(false);
-                    }
-                    catch (Exception exception)
-                    {
-                        Logger.LogError(exception, $"Error while calling {nameof(UnregisteredAsync)} from {nameof(ConsumerChannel)}");
-                    }
-                });
+                    await UnregisteredAsync.InvokeAllAsync(this, EventArgs.Empty).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError(exception, $"Error while calling {nameof(UnregisteredAsync)} from {nameof(ConsumerChannel)}");
+                }
+            });
         }
 
         return Task.CompletedTask;
@@ -289,18 +288,17 @@ internal sealed class ConsumerChannel : CarrotChannel, IConsumerChannel
         Logger.LogDebug("AsyncEventingBasicConsumer.RegisteredAsync {ConsumerTag}", string.Join(",", e.ConsumerTags));
         if (RegisteredAsync != null)
         {
-            _ = Task.Run(
-                async () =>
+            _ = Task.Run(async () =>
+            {
+                try
                 {
-                    try
-                    {
-                        await RegisteredAsync.InvokeAllAsync(this, EventArgs.Empty).ConfigureAwait(false);
-                    }
-                    catch (Exception exception)
-                    {
-                        Logger.LogError(exception, $"Error while calling {nameof(RegisteredAsync)} from {nameof(ConsumerChannel)}");
-                    }
-                });
+                    await RegisteredAsync.InvokeAllAsync(this, EventArgs.Empty).ConfigureAwait(false);
+                }
+                catch (Exception exception)
+                {
+                    Logger.LogError(exception, $"Error while calling {nameof(RegisteredAsync)} from {nameof(ConsumerChannel)}");
+                }
+            });
         }
 
         return Task.CompletedTask;

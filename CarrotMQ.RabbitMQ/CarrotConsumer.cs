@@ -155,7 +155,6 @@ internal sealed class CarrotConsumer : IAsyncDisposable
                     message.Header.Exchange,
                     message.Header.RoutingKey);
             }
-
         }
 
         return deliveryStatus;

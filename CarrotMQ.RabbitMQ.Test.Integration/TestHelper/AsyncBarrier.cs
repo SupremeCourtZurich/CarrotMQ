@@ -27,6 +27,7 @@ public class AsyncBarrier
             _waiters = new ConcurrentStack<TaskCompletionSource<bool>>();
             Parallel.ForEach(waiters, w => w.SetResult(true));
         }
+
         return tcs.Task;
     }
 }

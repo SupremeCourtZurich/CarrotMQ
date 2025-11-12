@@ -1,7 +1,6 @@
 ﻿using CarrotMQ.Core.MessageProcessing.Delivery;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.MessageProcessing.Delivery;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
 namespace CarrotMQ.RabbitMQ.Test;

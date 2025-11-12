@@ -3,7 +3,6 @@ using CarrotMQ.Core.MessageProcessing.Delivery;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.MessageProcessing.Delivery;
 using CarrotMQ.RabbitMQ.Test.Helper;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
 namespace CarrotMQ.RabbitMQ.Test;
@@ -356,7 +355,7 @@ public class MultiAckDeliveryTest
 
         await FireAckDeliveryTimerEvent().ConfigureAwait(false);
 
-        var singleAcked = _ackedList.Where(a => a.Multiple == false).Select(a => a.DeliveryTag).ToList();
+        var singleAcked = _ackedList.Where(a => !a.Multiple).Select(a => a.DeliveryTag).ToList();
         var maxMultiAck = _ackedList.Where(a => a.Multiple).Max(a => a.DeliveryTag);
 
         Assert.IsEmpty(
@@ -364,15 +363,18 @@ public class MultiAckDeliveryTest
             $"There should not be any rejected messages in {nameof(_rejectedList)} -> {string.Join(",", _rejectedList.Select(s => $"{{ Requeue: {s.Requeue}, DeliveryTag: {s.DeliveryTag} }}\r\n"))}");
 
         Assert.IsLessThan(
-multiAckWindowSize,
-            singleAcked.Count, $"{singleAcked.Count} < {multiAckWindowSize} (the amount of single acked messages must be smaller than the multiack window size)");
+            multiAckWindowSize,
+            singleAcked.Count,
+            $"{singleAcked.Count} < {multiAckWindowSize} (the amount of single acked messages must be smaller than the multiack window size)");
 
         Assert.IsTrue(
             singleAcked.All(s => s > messageCount - multiAckWindowSize),
             $"All single acked messages should be bigger than {messageCount - multiAckWindowSize} -> {string.Join(",", singleAcked)}");
 
-        Assert.IsGreaterThan<ulong>(messageCount - multiAckWindowSize,
-            maxMultiAck, $"{maxMultiAck} >  {messageCount - multiAckWindowSize} (biggest multi ack should be inside the last multiack window)");
+        Assert.IsGreaterThan<ulong>(
+            messageCount - multiAckWindowSize,
+            maxMultiAck,
+            $"{maxMultiAck} >  {messageCount - multiAckWindowSize} (biggest multi ack should be inside the last multiack window)");
 
         Assert.AreEqual(messageCount, (ulong)singleAcked.Count + maxMultiAck, "Max(multi acked) + amount of single acked = messageCount");
     }

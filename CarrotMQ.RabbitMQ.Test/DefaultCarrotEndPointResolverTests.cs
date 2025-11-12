@@ -1,7 +1,6 @@
 ﻿using CarrotMQ.RabbitMQ.Configuration;
 using CarrotMQ.RabbitMQ.Connectivity;
 using Microsoft.Extensions.Options;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 using RabbitMQ.Client;
 

@@ -1,5 +1,4 @@
 ﻿using CarrotMQ.RabbitMQ.Configuration;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CarrotMQ.RabbitMQ.Test;
 

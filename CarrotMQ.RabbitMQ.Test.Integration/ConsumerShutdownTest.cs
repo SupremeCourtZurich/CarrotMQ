@@ -147,13 +147,12 @@ public class ConsumerShutdownTest
             _injector.HandlerHit.Release();
             _logger.LogTrace("Handler1 HIT");
             // ReSharper disable once UseAwaitUsing
-            using var registration = cancellationToken.Register(
-                () =>
-                {
-                    _logger.LogTrace("Handler1 SHUTDOWN RECEIVED");
+            using var registration = cancellationToken.Register(() =>
+            {
+                _logger.LogTrace("Handler1 SHUTDOWN RECEIVED");
 
-                    _injector.HandlerShutdownReceived.Release();
-                });
+                _injector.HandlerShutdownReceived.Release();
+            });
 
             // ReSharper disable once MethodSupportsCancellation
             await _injector.AllowHandlerToComplete.WaitAsync(TimeSpan.FromSeconds(20)).ConfigureAwait(false);

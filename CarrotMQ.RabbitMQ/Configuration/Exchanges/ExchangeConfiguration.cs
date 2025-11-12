@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace CarrotMQ.RabbitMQ.Configuration.Exchanges;
 
@@ -22,18 +23,18 @@ internal class ExchangeConfiguration
 
     /// <summary>
     /// Flag indicating whether the exchange is durable.<br />
-    /// Defaults to <see langword="true"/>.
+    /// Defaults to <see langword="true" />.
     /// </summary>
     internal bool Durable { get; set; } = true;
 
     /// <summary>
     /// Flag indicating whether the exchange is automatically deleted when the last bound queue is unbound.<br />
-    /// Defaults to <see langword="false"/>.
+    /// Defaults to <see langword="false" />.
     /// </summary>
     internal bool AutoDelete { get; set; }
 
     /// <summary>
     /// Additional arguments for configuring the exchange.
     /// </summary>
-    internal IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>(System.StringComparer.Ordinal);
+    internal IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>(StringComparer.Ordinal);
 }

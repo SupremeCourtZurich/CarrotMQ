@@ -41,12 +41,11 @@ internal class Program
     }
 
     public static IHostBuilder CreateHostBuilder(string[] args) => Host.CreateDefaultBuilder(args)
-        .ConfigureWebHostDefaults(
-            webBuilder =>
-            {
-                webBuilder.UseStartup<Program>();
-                webBuilder.UseUrls(BaseUrl); // Set your URL and port
-            });
+        .ConfigureWebHostDefaults(webBuilder =>
+        {
+            webBuilder.UseStartup<Program>();
+            webBuilder.UseUrls(BaseUrl); // Set your URL and port
+        });
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {

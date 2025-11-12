@@ -14,6 +14,8 @@ public class CarrotClientResponseTests
     private ICarrotClient _carrotClient = null!;
     private ITransport _transport = null!;
 
+    public TestContext TestContext { get; set; }
+
     [TestInitialize]
     public void Initialize()
     {
@@ -42,16 +44,16 @@ public class CarrotClientResponseTests
     public async Task SendReceiveAsync_RequestTimeout_With_Ttl()
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .ReturnsForAnyArgs(
-                async callInfo =>
-                {
-                    await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false);
+            .ReturnsForAnyArgs(async callInfo =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false);
 
-                    return new CarrotMessage();
-                });
+                return new CarrotMessage();
+            });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendReceiveAsync(request, messageProperties: new MessageProperties { Ttl = 1 }).ConfigureAwait(false));
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await _carrotClient.SendReceiveAsync(request, messageProperties: new MessageProperties { Ttl = 1 }).ConfigureAwait(false));
     }
 
     [TestMethod]
@@ -99,11 +101,17 @@ public class CarrotClientResponseTests
     public async Task SendAsync_RequestTimeout_With_Ttl()
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .ReturnsForAnyArgs(
-                async callInfo => { await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false); });
+            .ReturnsForAnyArgs(async callInfo =>
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false);
+            });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendAsync(request, messageProperties: new MessageProperties { Ttl = 1 }, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false));
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendAsync(
+                request,
+                messageProperties: new MessageProperties { Ttl = 1 },
+                cancellationToken: TestContext.CancellationToken)
+            .ConfigureAwait(false));
     }
 
     [TestMethod]
@@ -135,6 +143,4 @@ public class CarrotClientResponseTests
 
         await Assert.ThrowsAsync<Exception>(async () => await _carrotClient.SendAsync(request).ConfigureAwait(false));
     }
-
-    public TestContext TestContext { get; set; }
 }

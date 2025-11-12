@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using RabbitMQ.Client.Events;
 
 namespace CarrotMQ.RabbitMQ.MessageProcessing;
@@ -7,7 +8,7 @@ namespace CarrotMQ.RabbitMQ.MessageProcessing;
 internal sealed class RunningTaskRegistry : IRunningTaskRegistry
 {
 #if NET9_0_OR_GREATER
-    private readonly System.Threading.Lock _taskCounterLock = new();
+    private readonly Lock _taskCounterLock = new();
 #else
     private readonly object _taskCounterLock = new();
 #endif

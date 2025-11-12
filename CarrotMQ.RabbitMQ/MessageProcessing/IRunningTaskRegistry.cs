@@ -16,7 +16,7 @@ public interface IRunningTaskRegistry
     /// Attempts to add a running task associated to the provided <see cref="BasicDeliverEventArgs" />.
     /// </summary>
     /// <param name="ea">The <see cref="BasicDeliverEventArgs" /> representing the running task.</param>
-    /// <returns><see langword="true"/> if the running task was successfully added; otherwise, <see langword="false"/>.</returns>
+    /// <returns><see langword="true" /> if the running task was successfully added; otherwise, <see langword="false" />.</returns>
     bool TryAdd(BasicDeliverEventArgs ea);
 
     /// <summary>

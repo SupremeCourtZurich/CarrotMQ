@@ -26,12 +26,14 @@ public interface IConsumerChannel : ICarrotChannel
     /// Starts an asynchronous consumer on the channel.
     /// </summary>
     /// <param name="queueName">The queue name to consume from.</param>
-    /// <param name="ackCount">Acknowledgment count:
+    /// <param name="ackCount">
+    /// Acknowledgment count:
     /// <list type="table">
     ///     <item><c>0</c> -> autoAck</item>
     ///     <item><c>1</c> -> ack/nack for every message</item>
     ///     <item><c>>1</c> -> ack/nack for multiple messages</item>
-    /// </list></param>
+    /// </list>
+    /// </param>
     /// <param name="prefetchCount">
     /// Maximum number of concurrent messages that the broker will deliver, 0 if unlimited.(see
     /// <see href="https://www.rabbitmq.com/confirms.html#channel-qos-prefetch" />).

@@ -87,10 +87,11 @@ public class QueueEndPointDirectReplyCmdTest : TestBaseDirectReply
         const int id = 1208;
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            var sendTask = CarrotClient.SendReceiveAsync(new QueueEndPointCmd(id) { DoRetry = true });
-            await VerifyDoRetry(id, sendTask).ConfigureAwait(false);
-        }).ConfigureAwait(false);
+            {
+                var sendTask = CarrotClient.SendReceiveAsync(new QueueEndPointCmd(id) { DoRetry = true });
+                await VerifyDoRetry(id, sendTask).ConfigureAwait(false);
+            })
+            .ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -100,17 +101,16 @@ public class QueueEndPointDirectReplyCmdTest : TestBaseDirectReply
         const int timeoutMs = 550;
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-        {
-            var sendTask = CarrotClient.SendReceiveAsync(
-                new QueueEndPointCmd(id)
-                {
-                    TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
-                    WaitDurationCount = 2
-                },
-                messageProperties: new MessageProperties { Ttl = 600 });
-            await VerifyOperationCanceled(id, sendTask).ConfigureAwait(false);
-        }).ConfigureAwait(false);
-
-      
+            {
+                var sendTask = CarrotClient.SendReceiveAsync(
+                    new QueueEndPointCmd(id)
+                    {
+                        TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
+                        WaitDurationCount = 2
+                    },
+                    messageProperties: new MessageProperties { Ttl = 600 });
+                await VerifyOperationCanceled(id, sendTask).ConfigureAwait(false);
+            })
+            .ConfigureAwait(false);
     }
 }

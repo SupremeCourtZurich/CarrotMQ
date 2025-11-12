@@ -32,7 +32,7 @@ public sealed class EndPointTests
     [TestMethod]
     public void QueueEndPoint_With_ArgumentException(string queueName)
     {
-       Assert.ThrowsExactly<ArgumentException>(() => new TestQueueEndPoint(queueName));
+        Assert.ThrowsExactly<ArgumentException>(() => new TestQueueEndPoint(queueName));
     }
 
     [TestMethod]

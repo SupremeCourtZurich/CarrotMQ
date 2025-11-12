@@ -67,6 +67,7 @@ public class IntervalTimerTest
             (int)(amountOfIntervals * 0.5); // only expect 50% of the triggers to actually hit, due to very small interval of 10ms
         Assert.IsGreaterThan(
             minimumExpectedAmountOfTriggers,
-            elapsedTriggeredCounter, $"IntervalTier should have triggered at least {minimumExpectedAmountOfTriggers} times, but it only did trigger {elapsedTriggeredCounter} times");
+            elapsedTriggeredCounter,
+            $"IntervalTier should have triggered at least {minimumExpectedAmountOfTriggers} times, but it only did trigger {elapsedTriggeredCounter} times");
     }
 }

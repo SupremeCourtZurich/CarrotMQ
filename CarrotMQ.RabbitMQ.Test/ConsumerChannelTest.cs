@@ -4,7 +4,6 @@ using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Serialization;
 using CarrotMQ.RabbitMQ.Test.Helper;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;

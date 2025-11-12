@@ -6,13 +6,12 @@ public static class TestLoggerFactory
 {
     static TestLoggerFactory()
     {
-        Instance = LoggerFactory.Create(
-            builder =>
-            {
-                builder
-                    .SetMinimumLevel(LogLevel.Trace)
-                    .AddConsole();
-            });
+        Instance = LoggerFactory.Create(builder =>
+        {
+            builder
+                .SetMinimumLevel(LogLevel.Trace)
+                .AddConsole();
+        });
     }
 
     public static ILoggerFactory Instance { get; set; }

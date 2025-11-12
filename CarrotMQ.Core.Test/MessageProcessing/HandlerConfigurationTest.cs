@@ -93,7 +93,8 @@ public class HandlerConfigurationTest
     [TestMethod]
     public void HandlerConfiguration_AddCommandHandler_GenericRequestType_ThrowsException()
     {
-        Assert.ThrowsExactly<GenericMessageTypeException>(() => _handlerCollection.AddCommand<TestCommandGenericHandler, TestCommandGeneric<string>, TestResponse>());
+        Assert.ThrowsExactly<GenericMessageTypeException>(() =>
+            _handlerCollection.AddCommand<TestCommandGenericHandler, TestCommandGeneric<string>, TestResponse>());
     }
 
     #region TestClasses

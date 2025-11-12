@@ -281,25 +281,24 @@ internal class CarrotChannel : ICarrotChannel
         //     Declaring an existing queue/exchange with non-matching properties
 
 #pragma warning disable MA0134
-        Task.Run(
-            async () =>
-            {
-                using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        Task.Run(async () =>
+        {
+            using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
 
-                while (IsClosed)
+            while (IsClosed)
+            {
+                try
                 {
-                    try
-                    {
-                        await EnsureOrRecoverChannelAsync().ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "AMQP channel recovery failed -> retry");
-                        await Task.Delay(_networkRecoveryInterval)
-                            .ConfigureAwait(false); // Avoid floading RabbitMQ when something is wrong
-                    }
+                    await EnsureOrRecoverChannelAsync().ConfigureAwait(false);
                 }
-            });
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "AMQP channel recovery failed -> retry");
+                    await Task.Delay(_networkRecoveryInterval)
+                        .ConfigureAwait(false); // Avoid floading RabbitMQ when something is wrong
+                }
+            }
+        });
 #pragma warning restore MA0134
 
         return Task.CompletedTask;

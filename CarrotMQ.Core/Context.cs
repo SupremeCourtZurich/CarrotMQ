@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace CarrotMQ.Core;
 
@@ -17,7 +18,7 @@ public class Context
     {
         InitialUserName = initialUserName;
         InitialServiceName = initialServiceName;
-        CustomHeader = customHeader ?? new Dictionary<string, string>(System.StringComparer.Ordinal);
+        CustomHeader = customHeader ?? new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     /// <summary>

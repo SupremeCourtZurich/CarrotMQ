@@ -89,13 +89,12 @@ public class CarrotMiddlewareTest
         await _messageDistributor.DistributeAsync(message, default);
 
         //Assert
-        Received.InOrder(
-            async void () =>
-            {
-                await middleware1.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
-                await middleware2.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
-                await middleware3.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
-            });
+        Received.InOrder(async void () =>
+        {
+            await middleware1.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
+            await middleware2.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
+            await middleware3.InvokeAsync(Arg.Any<MiddlewareContext>(), Arg.Any<Func<Task>>()).ConfigureAwait(false);
+        });
     }
 
     private static ICarrotMiddleware GetMiddlewareSubstitute()

@@ -102,14 +102,13 @@ public class MessageEnricherTest
         var newId = Guid.NewGuid();
 
         var client = CreateCarrotClient(
-            new TestEnricher(
-                (message, _, _) =>
+            new TestEnricher((message, _, _) =>
+            {
+                if (message is TestCommand cmd)
                 {
-                    if (message is TestCommand cmd)
-                    {
-                        cmd.Id = newId;
-                    }
-                }));
+                    cmd.Id = newId;
+                }
+            }));
 
         //Act
         await client.SendReceiveAsync(new TestCommand());
@@ -128,14 +127,13 @@ public class MessageEnricherTest
         var newId = Guid.NewGuid();
 
         var client = CreateCarrotClient(
-            new TestEnricher(
-                (message, _, _) =>
+            new TestEnricher((message, _, _) =>
+            {
+                if (message is TestCommand cmd)
                 {
-                    if (message is TestCommand cmd)
-                    {
-                        cmd.Id = newId;
-                    }
-                }));
+                    cmd.Id = newId;
+                }
+            }));
 
         //Act
         await client.SendAsync(new TestCommand());
@@ -212,12 +210,11 @@ public class MessageEnricherTest
 
         var services = new ServiceCollection();
         services.AddMessageEnricher((_, _, _) => firstCalled = true);
-        services.AddMessageEnricher(
-            (_, _, _) =>
-            {
-                if (!firstCalled) throw new Exception("Second delegate called before first");
-                secondCalled = true;
-            });
+        services.AddMessageEnricher((_, _, _) =>
+        {
+            if (!firstCalled) throw new Exception("Second delegate called before first");
+            secondCalled = true;
+        });
 
         var client = CreateCarrotClient(services.BuildServiceProvider().GetServices<IMessageEnricher>());
 
@@ -240,12 +237,11 @@ public class MessageEnricherTest
         var services = new ServiceCollection();
         services.AddSingleton<IMessageEnricher>(new TestEnricher((_, _, _) => firstCalled = true));
         services.AddSingleton<IMessageEnricher>(
-            new TestEnricher(
-                (_, _, _) =>
-                {
-                    if (!firstCalled) throw new Exception("Second delegate called before first");
-                    secondCalled = true;
-                }));
+            new TestEnricher((_, _, _) =>
+            {
+                if (!firstCalled) throw new Exception("Second delegate called before first");
+                secondCalled = true;
+            }));
 
         var client = CreateCarrotClient(services.BuildServiceProvider().GetServices<IMessageEnricher>());
 
@@ -268,12 +264,11 @@ public class MessageEnricherTest
         var services = new ServiceCollection();
         services.AddMessageEnricher((_, _, _) => firstCalled = true);
         services.AddSingleton<IMessageEnricher>(
-            new TestEnricher(
-                (_, _, _) =>
-                {
-                    if (!firstCalled) throw new Exception("Second delegate called before first");
-                    secondCalled = true;
-                }));
+            new TestEnricher((_, _, _) =>
+            {
+                if (!firstCalled) throw new Exception("Second delegate called before first");
+                secondCalled = true;
+            }));
 
         var client = CreateCarrotClient(services.BuildServiceProvider().GetServices<IMessageEnricher>());
 
@@ -290,6 +285,7 @@ public class MessageEnricherTest
     private ICarrotClient CreateCarrotClient(params IMessageEnricher[] messageEnrichers)
     {
         var messageBuilder = new CarrotMessageBuilder(messageEnrichers, _serializer, new DefaultRoutingKeyResolver());
+
         return new CarrotClient(_transport, _serializer, messageBuilder);
     }
 
@@ -314,13 +310,12 @@ public class TestEnricher : IMessageEnricher
         _func = func;
     }
 
-    public TestEnricher(Action<object, Context, CancellationToken> action) : this(
-        (m, ctx, c) =>
-        {
-            action(m, ctx, c);
+    public TestEnricher(Action<object, Context, CancellationToken> action) : this((m, ctx, c) =>
+    {
+        action(m, ctx, c);
 
-            return Task.CompletedTask;
-        })
+        return Task.CompletedTask;
+    })
     {
     }
 

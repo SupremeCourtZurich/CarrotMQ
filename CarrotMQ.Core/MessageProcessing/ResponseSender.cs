@@ -70,7 +70,8 @@ public sealed class ResponseSender : IResponseSender
             CalledMethod = CalledMethodResolver.BuildResponseCalledMethodKey(requestMessage.Header.CalledMethod),
             CustomHeader = requestMessage.Header.CustomHeader?.ToDictionary(
                 entry => entry.Key,
-                entry => entry.Value, StringComparer.Ordinal),
+                entry => entry.Value,
+                StringComparer.Ordinal),
             CorrelationId = requestMessage.Header.CorrelationId,
             MessageProperties = requestMessage.Header.MessageProperties,
             MessageId = Guid.NewGuid(),

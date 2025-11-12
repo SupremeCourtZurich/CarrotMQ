@@ -38,37 +38,34 @@ public class ServiceLifetimeTest
     {
         var applicationBuilder = Host.CreateApplicationBuilder(["environment=Development"]);
 
-        applicationBuilder.Logging.AddSimpleConsole(
-            options =>
-            {
-                options.IncludeScopes = true;
-                options.SingleLine = true;
-                options.TimestampFormat = "HH:mm:ss.sss ";
-            });
+        applicationBuilder.Logging.AddSimpleConsole(options =>
+        {
+            options.IncludeScopes = true;
+            options.SingleLine = true;
+            options.TimestampFormat = "HH:mm:ss.sss ";
+        });
 
-        applicationBuilder.Services.AddCarrotMqRabbitMq(
-            builder =>
-            {
-                builder.ConfigureBrokerConnection(
-                    configureOptions: options =>
-                    {
-                        TestBase.ConfigureBroker(options);
-                        options.ServiceName = "DI-Registration";
-                    });
+        applicationBuilder.Services.AddCarrotMqRabbitMq(builder =>
+        {
+            builder.ConfigureBrokerConnection(
+                configureOptions: options =>
+                {
+                    TestBase.ConfigureBroker(options);
+                    options.ServiceName = "DI-Registration";
+                });
 
-                var exchange = builder.Exchanges.AddDirect<TestExchange>();
+            var exchange = builder.Exchanges.AddDirect<TestExchange>();
 
-                var queue = builder.Queues.AddQuorum(QueueName)
-                    .WithConsumer(
-                        c => c
-                            .WithPrefetchCount(0)
-                            .WithSingleAck());
+            var queue = builder.Queues.AddQuorum(QueueName)
+                .WithConsumer(c => c
+                    .WithPrefetchCount(0)
+                    .WithSingleAck());
 
-                builder.Handlers.AddEvent<DiTestEventHandler, TestEvent>()
-                    .BindTo(exchange, queue);
+            builder.Handlers.AddEvent<DiTestEventHandler, TestEvent>()
+                .BindTo(exchange, queue);
 
-                builder.StartAsHostedService();
-            });
+            builder.StartAsHostedService();
+        });
 
         applicationBuilder.Services.Add(new ServiceDescriptor(typeof(IHaveDependency), typeof(MyDependency), serviceLifetime));
 

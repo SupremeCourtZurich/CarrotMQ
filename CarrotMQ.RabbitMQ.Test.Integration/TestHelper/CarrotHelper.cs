@@ -15,18 +15,17 @@ public class CarrotHelper : IDisposable
     {
         var applicationBuilder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(["environment=Development"]);
 
-        applicationBuilder.Services.AddCarrotMqRabbitMq(
-            builder =>
-            {
-                builder.ConfigureBrokerConnection(
-                    configureOptions: options =>
-                    {
-                        TestBase.ConfigureBroker(options);
-                        options.ServiceName = serviceName;
-                    });
+        applicationBuilder.Services.AddCarrotMqRabbitMq(builder =>
+        {
+            builder.ConfigureBrokerConnection(
+                configureOptions: options =>
+                {
+                    TestBase.ConfigureBroker(options);
+                    options.ServiceName = serviceName;
+                });
 
-                customConfig?.Invoke(builder);
-            });
+            customConfig?.Invoke(builder);
+        });
 
         serviceCollectionConfig?.Invoke(applicationBuilder.Services);
 
