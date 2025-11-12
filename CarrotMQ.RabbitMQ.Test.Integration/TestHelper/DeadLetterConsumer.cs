@@ -36,7 +36,7 @@ public sealed class DeadLetterConsumer : IAsyncDisposable
                 _protocolSerializer,
                 _loggerFactory)
             .ConfigureAwait(false);
-        var arguments = new Dictionary<string, object?> { { "x-queue-type", "quorum" } };
+        var arguments = new Dictionary<string, object?>(StringComparer.Ordinal) { { "x-queue-type", "quorum" } };
         await _consumerChannel.DeclareQueueAsync(queueName, true, false, false, arguments).ConfigureAwait(false);
         await _consumerChannel.BindQueueAsync(queueName, exchangeName, string.Empty).ConfigureAwait(false);
 

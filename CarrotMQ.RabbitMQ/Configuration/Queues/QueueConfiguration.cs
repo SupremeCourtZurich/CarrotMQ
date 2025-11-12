@@ -35,7 +35,7 @@ public sealed class QueueConfiguration
     /// <summary>
     /// Custom arguments that will directly be passed to the queue declaration (<see cref="IChannel.QueueDeclareAsync" />).
     /// </summary>
-    public IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>();
+    public IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>(System.StringComparer.Ordinal);
 
     /// <summary>
     /// Flag that determines whether the queue is created on start-up.<br />

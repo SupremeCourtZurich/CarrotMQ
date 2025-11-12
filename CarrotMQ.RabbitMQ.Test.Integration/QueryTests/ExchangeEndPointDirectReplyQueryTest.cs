@@ -82,30 +82,35 @@ public class ExchangeEndPointDirectReplyQueryTest : TestBaseDirectReply
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task ExchangeEndPoint_DirectReply_Retry()
     {
         const int id = 1108;
-        var sendTask = CarrotClient.SendReceiveAsync(new ExchangeEndPointQuery(id) { DoRetry = true });
 
-        await VerifyDoRetry(id, sendTask);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            var sendTask = CarrotClient.SendReceiveAsync(new ExchangeEndPointQuery(id) { DoRetry = true });
+
+            await VerifyDoRetry(id, sendTask).ConfigureAwait(false);
+        }).ConfigureAwait(false);
+       
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task ExchangeEndPoint_DirectReply_TimeOut()
     {
         const int id = 1109;
         const int timeoutMs = 550;
 
-        var sendTask = CarrotClient.SendReceiveAsync(
-            new ExchangeEndPointQuery(id)
-            {
-                TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
-                WaitDurationCount = 2
-            },
-            messageProperties: new MessageProperties { Ttl = 600 });
-
-        await VerifyOperationCanceled(id, sendTask);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+        {
+            var sendTask = CarrotClient.SendReceiveAsync(
+                new ExchangeEndPointQuery(id)
+                {
+                    TaskWaitDuration = TimeSpan.FromMilliseconds(timeoutMs),
+                    WaitDurationCount = 2
+                },
+                messageProperties: new MessageProperties { Ttl = 600 });
+            await VerifyOperationCanceled(id, sendTask).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 }

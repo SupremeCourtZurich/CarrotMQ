@@ -186,7 +186,7 @@ internal class CarrotMessageBuilder : ICarrotMessageBuilder
             MessageProperties = messageProperties ?? MessageProperties.Default,
             CustomHeader = ctx.CustomHeader.ToDictionary(
                 entry => entry.Key,
-                entry => entry.Value),
+                entry => entry.Value, StringComparer.Ordinal),
             ReplyExchange = replyEndPoint.Exchange,
             ReplyRoutingKey = replyEndPoint.RoutingKey,
             IncludeRequestPayloadInResponse = replyEndPoint.IncludeRequestPayloadInResponse

@@ -10,7 +10,6 @@ namespace CarrotMQ.RabbitMQ.Test;
 public class ChannelDisposeTest
 {
     [TestMethod]
-    [ExpectedException(typeof(ObjectDisposedException))]
     public async Task DoubleDisposeTest()
     {
         var brokerConnection = Substitute.For<IBrokerConnection>();
@@ -30,9 +29,12 @@ public class ChannelDisposeTest
                 loggerFactory)
             .ConfigureAwait(false);
 
-        var t1 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));
-        var t2 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));
+        await Assert.ThrowsAsync<ObjectDisposedException>(async () => 
+        { 
+            var t1 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));
+            var t2 = Task.Run(async () => await channel.DisposeAsync().ConfigureAwait(false));
 
-        await Task.WhenAll(t1, t2).ConfigureAwait(false);
+            await Task.WhenAll(t1, t2).ConfigureAwait(false);
+        }).ConfigureAwait(false);
     }
 }

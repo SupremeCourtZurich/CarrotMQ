@@ -26,7 +26,7 @@ public sealed class CarrotError
     public CarrotError(string message, IDictionary<string, string[]>? errors = null)
     {
         Message = message;
-        Errors = errors ?? new Dictionary<string, string[]>();
+        Errors = errors ?? new Dictionary<string, string[]>(System.StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -39,5 +39,5 @@ public sealed class CarrotError
     /// - Key = Request field path
     /// - Value = array of errors for the given field
     /// </summary>
-    public IDictionary<string, string[]> Errors { get; set; } = new Dictionary<string, string[]>();
+    public IDictionary<string, string[]> Errors { get; set; } = new Dictionary<string, string[]>(System.StringComparer.Ordinal);
 }

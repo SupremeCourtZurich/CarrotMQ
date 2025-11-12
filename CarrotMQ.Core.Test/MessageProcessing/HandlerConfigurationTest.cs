@@ -25,7 +25,7 @@ public class HandlerConfigurationTest
         string expectedHandlerKey = $"{typeof(HandlerConfigurationTest).FullName}+{nameof(TestCommand)}";
         _handlerCollection.AddCommand<TestCommandHandler, TestCommand, TestResponse>();
 
-        Assert.AreEqual(1, _handlerCollection.GetHandlers().Count);
+        Assert.HasCount(1, _handlerCollection.GetHandlers());
         var handlerProcessor = _handlerCollection.GetHandlers()[expectedHandlerKey];
         Assert.AreEqual(expectedHandlerKey, handlerProcessor.HandlerKey);
         Assert.AreEqual(typeof(TestCommandHandler), handlerProcessor.HandlerType);
@@ -37,7 +37,7 @@ public class HandlerConfigurationTest
         string expectedHandlerKey = $"{typeof(HandlerConfigurationTest).FullName}+{nameof(TestQuery)}";
         _handlerCollection.AddQuery<TestQueryHandler, TestQuery, TestResponse>();
 
-        Assert.AreEqual(1, _handlerCollection.GetHandlers().Count);
+        Assert.HasCount(1, _handlerCollection.GetHandlers());
         var handlerProcessor = _handlerCollection.GetHandlers()[expectedHandlerKey];
         Assert.AreEqual(expectedHandlerKey, handlerProcessor.HandlerKey);
         Assert.AreEqual(typeof(TestQueryHandler), handlerProcessor.HandlerType);
@@ -49,7 +49,7 @@ public class HandlerConfigurationTest
         string expectedHandlerKey = $"{typeof(HandlerConfigurationTest).FullName}+{nameof(TestEvent)}";
         _handlerCollection.AddEvent<TestEventHandler, TestEvent>();
 
-        Assert.AreEqual(1, _handlerCollection.GetHandlers().Count);
+        Assert.HasCount(1, _handlerCollection.GetHandlers());
         var handlerProcessor = _handlerCollection.GetHandlers()[expectedHandlerKey];
         Assert.AreEqual(expectedHandlerKey, handlerProcessor.HandlerKey);
         Assert.AreEqual(typeof(TestEventHandler), handlerProcessor.HandlerType);
@@ -61,7 +61,7 @@ public class HandlerConfigurationTest
         string expectedHandlerKey = $"{typeof(HandlerConfigurationTest).FullName}+{nameof(TestCustomEvent)}";
         _handlerCollection.AddCustomRoutingEvent<TestCustomEventHandler, TestCustomEvent>();
 
-        Assert.AreEqual(1, _handlerCollection.GetHandlers().Count);
+        Assert.HasCount(1, _handlerCollection.GetHandlers());
         var handlerProcessor = _handlerCollection.GetHandlers()[expectedHandlerKey];
         Assert.AreEqual(expectedHandlerKey, handlerProcessor.HandlerKey);
         Assert.AreEqual(typeof(TestCustomEventHandler), handlerProcessor.HandlerType);
@@ -74,25 +74,26 @@ public class HandlerConfigurationTest
 
         _handlerCollection.AddResponse<TestResponseHandlerBase, TestCommand, TestResponse>();
 
-        Assert.AreEqual(1, _handlerCollection.GetHandlers().Count);
+        Assert.HasCount(1, _handlerCollection.GetHandlers());
         var handlerProcessor = _handlerCollection.GetHandlers()[expectedHandlerKey];
         Assert.AreEqual(expectedHandlerKey, handlerProcessor.HandlerKey);
         Assert.AreEqual(typeof(TestResponseHandlerBase), handlerProcessor.HandlerType);
     }
 
     [TestMethod]
-    [ExpectedException(typeof(DuplicateHandlerKeyException))]
     public void HandlerConfiguration_AddCommandHandler_DifferentHandlers_With_Same_RequestType_ThrowsException()
     {
-        _handlerCollection.AddCommand<TestCommandHandler, TestCommand, TestResponse>();
-        _handlerCollection.AddCommand<TestCommandHandlerBase2, TestCommand, TestResponse>();
+        Assert.ThrowsExactly<DuplicateHandlerKeyException>(() =>
+        {
+            _handlerCollection.AddCommand<TestCommandHandler, TestCommand, TestResponse>();
+            _handlerCollection.AddCommand<TestCommandHandlerBase2, TestCommand, TestResponse>();
+        });
     }
 
     [TestMethod]
-    [ExpectedException(typeof(GenericMessageTypeException))]
     public void HandlerConfiguration_AddCommandHandler_GenericRequestType_ThrowsException()
     {
-        _handlerCollection.AddCommand<TestCommandGenericHandler, TestCommandGeneric<string>, TestResponse>();
+        Assert.ThrowsExactly<GenericMessageTypeException>(() => _handlerCollection.AddCommand<TestCommandGenericHandler, TestCommandGeneric<string>, TestResponse>());
     }
 
     #region TestClasses

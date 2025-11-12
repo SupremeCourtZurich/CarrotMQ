@@ -303,7 +303,9 @@ public class MessageEnricherTest
     private class TestResponse;
 }
 
+#pragma warning disable MA0048 // File name must match type name
 public class TestEnricher : IMessageEnricher
+#pragma warning restore MA0048 // File name must match type name
 {
     private readonly Func<object, Context, CancellationToken, Task> _func;
 

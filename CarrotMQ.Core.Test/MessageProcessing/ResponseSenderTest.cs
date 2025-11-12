@@ -42,7 +42,7 @@ public class ResponseSenderTest
             ReplyExchange = "ReplyExchange",
             ReplyRoutingKey = "ReplyRoutingKey",
             CalledMethod = "CalledMethod",
-            CustomHeader = new Dictionary<string, string> { { "key", "value" } },
+            CustomHeader = new Dictionary<string, string>(StringComparer.Ordinal) { { "key", "value" } },
             CorrelationId = Guid.NewGuid(),
             MessageProperties = new MessageProperties
             {
@@ -63,7 +63,7 @@ public class ResponseSenderTest
         middlewareContext.ResponseSent = false;
 
         await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
-        Assert.AreEqual(1, _publishedMessages.Count);
+        Assert.HasCount(1, _publishedMessages);
         var publishedMessage = _publishedMessages.First();
         var replyHeader = publishedMessage.Header;
         Assert.AreEqual(CalledMethodResolver.BuildResponseCalledMethodKey(message.Header.CalledMethod), replyHeader.CalledMethod);
@@ -86,8 +86,8 @@ public class ResponseSenderTest
         middlewareContext.ResponseSent = true;
 
         await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
-        Assert.AreEqual(0, _publishedMessages.Count);
-        Assert.AreEqual(0, _logger.LogMessages.Count);
+        Assert.IsEmpty(_publishedMessages);
+        Assert.IsEmpty(_logger.LogMessages);
     }
 
     [TestMethod]
@@ -100,7 +100,7 @@ public class ResponseSenderTest
         middlewareContext.ResponseSent = true;
 
         await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
-        Assert.AreEqual(0, _publishedMessages.Count);
+        Assert.IsEmpty(_publishedMessages);
 
         Assert.AreEqual(1, _logger.LogMessages.Count(m => m == LogLevel.Warning));
     }

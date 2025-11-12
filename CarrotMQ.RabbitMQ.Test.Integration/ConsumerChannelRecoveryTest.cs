@@ -95,8 +95,8 @@ public class ConsumerChannelRecoveryTest
         receivedId = await msgQueue.Reader.ReadAsync(cts.Token).ConfigureAwait(false);
         receivedIds.Add(receivedId);
 
-        Assert.IsTrue(receivedIds.Contains(1));
-        Assert.IsTrue(receivedIds.Contains(2));
+        Assert.Contains(1, receivedIds);
+        Assert.Contains(2, receivedIds);
 
         await publisher.PublishAsync(new CarrotMessage(new CarrotHeader { RoutingKey = QueueName }, "3"), cts.Token).ConfigureAwait(false);
         receivedId = await msgQueue.Reader.ReadAsync(cts.Token).ConfigureAwait(false);

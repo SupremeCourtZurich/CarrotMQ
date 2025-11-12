@@ -72,17 +72,23 @@ namespace CarrotMQ.Core.Test
 namespace CarrotMQ.Core.Test.RoutingKeyResolverTestNamespace
 {
     public class
+#pragma warning disable MA0048 // File name must match type name
         MyVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryTooLongClassName
+#pragma warning restore MA0048 // File name must match type name
     {
         public class MyClassName;
     }
 
+#pragma warning disable MA0048 // File name must match type name
     public class MyClassName;
+#pragma warning restore MA0048 // File name must match type name
 
     namespace
         MyVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongNamespace
     {
+#pragma warning disable MA0048 // File name must match type name
         public class MyClassName
+#pragma warning restore MA0048 // File name must match type name
         {
             public class MyInnerClassName;
         }

@@ -17,13 +17,12 @@ public class Context
     {
         InitialUserName = initialUserName;
         InitialServiceName = initialServiceName;
-        CustomHeader = customHeader ?? new Dictionary<string, string>();
+        CustomHeader = customHeader ?? new Dictionary<string, string>(System.StringComparer.Ordinal);
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Context" /> class.
     /// </summary>
-    /// <param name="ttl">TTL in milliseconds to set <see cref="MessageProperties.Ttl" /></param>
     /// <param name="context">All values are copied from this context except <see cref="MessageProperties.Ttl" /></param>
     public Context(Context context)
     {

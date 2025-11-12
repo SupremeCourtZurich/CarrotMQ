@@ -54,11 +54,10 @@ public sealed class ReplyEndPointTests
     [DataRow("")]
     [DataRow(" ")]
     [DataRow(null)]
-    [ExpectedException(typeof(ArgumentException))]
     [TestMethod]
     public void QueueReplyEndPoint_With_ArgumentException(string queueName)
     {
-        ReplyEndPointBase _ = new QueueReplyEndPoint(queueName);
+        Assert.ThrowsExactly<ArgumentException>(() => new QueueReplyEndPoint(queueName));
     }
 
     [TestMethod]
@@ -102,10 +101,12 @@ public sealed class ReplyEndPointTests
     [DataRow("")]
     [DataRow(" ")]
     [DataRow(null)]
-    [ExpectedException(typeof(ArgumentException))]
     [TestMethod]
     public void ExchangeReplyEndPoint_With_ArgumentException(string exchangeName)
     {
-        ReplyEndPointBase _ = new ExchangeReplyEndPoint(exchangeName);
+        Assert.ThrowsExactly<ArgumentException>(() =>
+        {
+            ReplyEndPointBase _ = new ExchangeReplyEndPoint(exchangeName);
+        });
     }
 }

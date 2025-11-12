@@ -62,8 +62,8 @@ public class MultiAckDeliveryTest
         AdvanceDateTime(ref baseDateTime);
         await ackBox.DeliverAsync(6, DeliveryStatus.Ack).ConfigureAwait(false);
 
-        Assert.AreEqual(2, _ackedList.Count);
-        Assert.AreEqual(0, _rejectedList.Count);
+        Assert.HasCount(2, _ackedList);
+        Assert.IsEmpty(_rejectedList);
         AssertAreEqual(3, _ackedList[0].DeliveryTag);
         AssertAreEqual(6, _ackedList[1].DeliveryTag);
         Assert.IsTrue(_ackedList[0].Multiple);
@@ -90,7 +90,7 @@ public class MultiAckDeliveryTest
         await FireAckDeliveryTimerEvent().ConfigureAwait(false);
 
         // Check both messages are single acked
-        Assert.AreEqual(2, _ackedList.Count);
+        Assert.HasCount(2, _ackedList);
         AssertAreEqual(1, _ackedList[0].DeliveryTag);
         Assert.IsFalse(_ackedList[0].Multiple);
         AssertAreEqual(2, _ackedList[1].DeliveryTag);
@@ -120,7 +120,7 @@ public class MultiAckDeliveryTest
         await ackBox.DeliverAsync((ulong)deliveryTag3, DeliveryStatus.Reject).ConfigureAwait(false);
 
         // Check messages are single acked
-        Assert.AreEqual(amountOfExpectedSingleAcks, _ackedList.Count);
+        Assert.HasCount(amountOfExpectedSingleAcks, _ackedList);
 
         for (var i = 0; i < amountOfExpectedSingleAcks; i++)
         {
@@ -128,7 +128,7 @@ public class MultiAckDeliveryTest
         }
 
         // Check NACK has been rejected
-        Assert.AreEqual(1, _rejectedList.Count);
+        Assert.HasCount(1, _rejectedList);
         AssertAreEqual(deliveryTag3, _rejectedList[0].DeliveryTag);
     }
 
@@ -146,7 +146,7 @@ public class MultiAckDeliveryTest
         await ackBox.DeliverAsync(1, nackDeliveryStatus).ConfigureAwait(false);
 
         // Check NACK has been rejected
-        Assert.AreEqual(1, _rejectedList.Count);
+        Assert.HasCount(1, _rejectedList);
         AssertAreEqual(1, _rejectedList[0].DeliveryTag);
         Assert.AreEqual(shouldRequeue, _rejectedList[0].Requeue);
     }
@@ -231,8 +231,8 @@ public class MultiAckDeliveryTest
         await FireAckDeliveryTimerEvent().ConfigureAwait(false);
 
         // Check 4 first messages single acked after timeout
-        Assert.AreEqual(1, _rejectedList.Count);
-        Assert.AreEqual(0, _ackedList.Count);
+        Assert.HasCount(1, _rejectedList);
+        Assert.HasCount(0, _ackedList);
     }
 
     [TestMethod]
@@ -259,7 +259,7 @@ public class MultiAckDeliveryTest
         await FireAckDeliveryTimerEvent().ConfigureAwait(false);
 
         // Check 4 first messages single acked after timeout
-        Assert.AreEqual(1, _ackedList.Count);
+        Assert.HasCount(1, _ackedList);
         AssertAreEqual(3, _ackedList[0].DeliveryTag);
         Assert.IsTrue(_ackedList[0].Multiple);
     }
@@ -288,7 +288,7 @@ public class MultiAckDeliveryTest
         await ackBox.DeliverAsync(4, DeliveryStatus.Reject).ConfigureAwait(false);
 
         // Check 4 first messages single acked after timeout
-        Assert.AreEqual(1, _ackedList.Count);
+        Assert.HasCount(1, _ackedList);
         AssertAreEqual(3, _ackedList[0].DeliveryTag);
         Assert.IsTrue(_ackedList[0].Multiple);
     }
@@ -310,7 +310,7 @@ public class MultiAckDeliveryTest
         await ackBox.DeliverAsync(130, DeliveryStatus.Ack).ConfigureAwait(false);
 
         // Check 130 is singleAcked immediately
-        Assert.AreEqual(1, _ackedList.Count);
+        Assert.HasCount(1, _ackedList);
         AssertAreEqual(130, _ackedList[0].DeliveryTag);
         Assert.IsFalse(_ackedList[0].Multiple);
     }
@@ -331,8 +331,8 @@ public class MultiAckDeliveryTest
         await FireAckDeliveryTimerEvent().ConfigureAwait(false);
 
         // Check 4 first messages single acked after timeout
-        Assert.AreEqual(0, _rejectedList.Count);
-        Assert.AreEqual(1, _ackedList.Count);
+        Assert.HasCount(0, _rejectedList);
+        Assert.HasCount(1, _ackedList);
     }
 
     [TestMethod]
@@ -359,22 +359,20 @@ public class MultiAckDeliveryTest
         var singleAcked = _ackedList.Where(a => a.Multiple == false).Select(a => a.DeliveryTag).ToList();
         var maxMultiAck = _ackedList.Where(a => a.Multiple).Max(a => a.DeliveryTag);
 
-        Assert.AreEqual(
-            0,
-            _rejectedList.Count,
+        Assert.IsEmpty(
+            _rejectedList,
             $"There should not be any rejected messages in {nameof(_rejectedList)} -> {string.Join(",", _rejectedList.Select(s => $"{{ Requeue: {s.Requeue}, DeliveryTag: {s.DeliveryTag} }}\r\n"))}");
 
-        Assert.IsTrue(
-            singleAcked.Count < multiAckWindowSize,
-            $"{singleAcked.Count} < {multiAckWindowSize} (the amount of single acked messages must be smaller than the multiack window size)");
+        Assert.IsLessThan(
+multiAckWindowSize,
+            singleAcked.Count, $"{singleAcked.Count} < {multiAckWindowSize} (the amount of single acked messages must be smaller than the multiack window size)");
 
         Assert.IsTrue(
             singleAcked.All(s => s > messageCount - multiAckWindowSize),
             $"All single acked messages should be bigger than {messageCount - multiAckWindowSize} -> {string.Join(",", singleAcked)}");
 
-        Assert.IsTrue(
-            maxMultiAck > messageCount - multiAckWindowSize,
-            $"{maxMultiAck} >  {messageCount - multiAckWindowSize} (biggest multi ack should be inside the last multiack window)");
+        Assert.IsGreaterThan<ulong>(messageCount - multiAckWindowSize,
+            maxMultiAck, $"{maxMultiAck} >  {messageCount - multiAckWindowSize} (biggest multi ack should be inside the last multiack window)");
 
         Assert.AreEqual(messageCount, (ulong)singleAcked.Count + maxMultiAck, "Max(multi acked) + amount of single acked = messageCount");
     }

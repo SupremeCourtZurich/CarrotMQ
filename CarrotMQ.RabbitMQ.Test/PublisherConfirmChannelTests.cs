@@ -108,13 +108,13 @@ public class PublisherConfirmChannelTests
         await VerifyBasicPublishAsync(7).ConfigureAwait(false);
     }
 
-    [DataTestMethod]
     [DataRow(2, 1, 1)]
     [DataRow(2, 1, 2)]
     [DataRow(3, 0, 1)]
     [DataRow(3, 0, 2)]
     [DataRow(3, 0, 3)]
     [DataRow(3, 2, 2)]
+    [TestMethod]
     public async Task Republish(int oldMsgs, int newMsgs, int ackSeqNo)
     {
         // 1) Publish messages
@@ -151,7 +151,7 @@ public class PublisherConfirmChannelTests
         var task = PublishAsync(1, CancellationToken.None).First();
         await RepublishAsync(_publisherConfirmOptions.RetryLimit + 1);
 
-        await Assert.ThrowsExceptionAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+        await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
 
         await VerifyBasicPublishAsync(6).ConfigureAwait(false);
     }
@@ -183,7 +183,7 @@ public class PublisherConfirmChannelTests
 
         // 2) Cancel publish
         tokenSource.Cancel();
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => task).ConfigureAwait(false);
+        await Assert.ThrowsAsync <TaskCanceledException>(() => task).ConfigureAwait(false);
 
         // Nothing should be republished
         await RepublishAsync(1).ConfigureAwait(false);
@@ -204,7 +204,7 @@ public class PublisherConfirmChannelTests
 
         // 3) Cancel first 3 publishes
         tokenSource.Cancel();
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<TaskCanceledException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
 
         // Republish last message
         await RepublishAsync(1).ConfigureAwait(false);

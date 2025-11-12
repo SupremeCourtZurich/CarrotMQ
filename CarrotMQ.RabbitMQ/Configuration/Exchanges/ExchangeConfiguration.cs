@@ -35,5 +35,5 @@ internal class ExchangeConfiguration
     /// <summary>
     /// Additional arguments for configuring the exchange.
     /// </summary>
-    internal IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>();
+    internal IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>(System.StringComparer.Ordinal);
 }

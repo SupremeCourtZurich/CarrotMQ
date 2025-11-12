@@ -39,7 +39,6 @@ public class CarrotClientResponseTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendReceiveAsync_RequestTimeout_With_Ttl()
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
@@ -52,33 +51,30 @@ public class CarrotClientResponseTests
                 });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendReceiveAsync(request, messageProperties: new MessageProperties { Ttl = 1 });
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendReceiveAsync(request, messageProperties: new MessageProperties { Ttl = 1 }).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendReceiveAsync_RequestTimeout()
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new OperationCanceledException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendReceiveAsync(request);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendReceiveAsync(request).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(RetryLimitExceededException))]
     public async Task SendReceiveAsync_RetryLimitException()
     {
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new RetryLimitExceededException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendReceiveAsync(request);
+        await Assert.ThrowsAsync<RetryLimitExceededException>(async () => await _carrotClient.SendReceiveAsync(request).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(Exception), AllowDerivedTypes = true)]
     public async Task SendReceiveAsync_InternalServerError()
     {
         const string exMessage = "my very important message";
@@ -86,7 +82,7 @@ public class CarrotClientResponseTests
             .ReturnsForAnyArgs<Task<CarrotMessage>>(_ => throw new Exception(exMessage));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendReceiveAsync(request);
+        await Assert.ThrowsAsync<Exception>(async () => await _carrotClient.SendReceiveAsync(request).ConfigureAwait(false));
     }
 
     [TestMethod]
@@ -100,7 +96,6 @@ public class CarrotClientResponseTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendAsync_RequestTimeout_With_Ttl()
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
@@ -108,39 +103,38 @@ public class CarrotClientResponseTests
                 async callInfo => { await Task.Delay(Timeout.InfiniteTimeSpan, callInfo.Arg<CancellationToken>()).ConfigureAwait(false); });
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendAsync(request, messageProperties: new MessageProperties { Ttl = 1 });
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendAsync(request, messageProperties: new MessageProperties { Ttl = 1 }, cancellationToken: TestContext.CancellationToken).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException), AllowDerivedTypes = true)]
     public async Task SendAsync_RequestTimeout()
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => throw new OperationCanceledException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendAsync(request);
+        await Assert.ThrowsAsync<OperationCanceledException>(async () => await _carrotClient.SendAsync(request).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(RetryLimitExceededException))]
     public async Task SendAsync_RetryLimitException()
     {
         _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
             .ReturnsForAnyArgs(_ => throw new RetryLimitExceededException());
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendAsync(request);
+        await Assert.ThrowsAsync<RetryLimitExceededException>(async () => await _carrotClient.SendAsync(request).ConfigureAwait(false));
     }
 
     [TestMethod]
-    [ExpectedException(typeof(Exception))]
     public async Task SendAsync_InternalServerError()
     {
         const string exMessage = "my very important message";
         _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None).ReturnsForAnyArgs(_ => throw new Exception(exMessage));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> request = new TestDto(1);
 
-        await _carrotClient.SendAsync(request);
+        await Assert.ThrowsAsync<Exception>(async () => await _carrotClient.SendAsync(request).ConfigureAwait(false));
     }
+
+    public TestContext TestContext { get; set; }
 }

@@ -35,8 +35,8 @@ public class SingleAckDeliveryTest
         await _ackBox.DeliverAsync(2, DeliveryStatus.Ack).ConfigureAwait(false);
         await _ackBox.DeliverAsync(3, DeliveryStatus.Ack).ConfigureAwait(false);
 
-        Assert.AreEqual(3, _ackedList.Count);
-        Assert.AreEqual(0, _rejectedList.Count);
+        Assert.HasCount(3, _ackedList);
+        Assert.IsEmpty(_rejectedList);
 
         AssertAreEqual(1, _ackedList[0].DeliveryTag);
         AssertAreEqual(2, _ackedList[1].DeliveryTag);
@@ -54,8 +54,8 @@ public class SingleAckDeliveryTest
         await _ackBox.DeliverAsync(2, DeliveryStatus.Reject).ConfigureAwait(false);
         await _ackBox.DeliverAsync(3, DeliveryStatus.Reject).ConfigureAwait(false);
 
-        Assert.AreEqual(0, _ackedList.Count);
-        Assert.AreEqual(3, _rejectedList.Count);
+        Assert.IsEmpty(_ackedList);
+        Assert.HasCount(3, _rejectedList);
 
         AssertAreEqual(1, _rejectedList[0].DeliveryTag);
         AssertAreEqual(2, _rejectedList[1].DeliveryTag);
@@ -73,8 +73,8 @@ public class SingleAckDeliveryTest
         await _ackBox.DeliverAsync(2, DeliveryStatus.Retry).ConfigureAwait(false);
         await _ackBox.DeliverAsync(3, DeliveryStatus.Retry).ConfigureAwait(false);
 
-        Assert.AreEqual(0, _ackedList.Count);
-        Assert.AreEqual(3, _rejectedList.Count);
+        Assert.IsEmpty(_ackedList);
+        Assert.HasCount(3, _rejectedList);
 
         AssertAreEqual(1, _rejectedList[0].DeliveryTag);
         AssertAreEqual(2, _rejectedList[1].DeliveryTag);
@@ -92,8 +92,8 @@ public class SingleAckDeliveryTest
         await _ackBox.DeliverAsync(2, DeliveryStatus.Reject).ConfigureAwait(false);
         await _ackBox.DeliverAsync(3, DeliveryStatus.Retry).ConfigureAwait(false);
 
-        Assert.AreEqual(1, _ackedList.Count);
-        Assert.AreEqual(2, _rejectedList.Count);
+        Assert.HasCount(1, _ackedList);
+        Assert.HasCount(2, _rejectedList);
 
         AssertAreEqual(1, _ackedList[0].DeliveryTag);
         AssertAreEqual(2, _rejectedList[0].DeliveryTag);

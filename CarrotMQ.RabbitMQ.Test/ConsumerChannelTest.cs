@@ -92,7 +92,7 @@ public class ConsumerChannelTest
 
         await ConsumeCarrotMessageAsync().ConfigureAwait(false);
 
-        Assert.AreEqual(1, _rejectedMessages.Count); // reject has been sent after 1s timeout despite the message not being finished processing
+        Assert.HasCount(1, _rejectedMessages); // reject has been sent after 1s timeout despite the message not being finished processing
         Assert.AreEqual((ulong)1, _rejectedMessages.First()); // deliveryTag of rejected message = 1
 
         await _consumerChannel.DisposeAsync().ConfigureAwait(false);

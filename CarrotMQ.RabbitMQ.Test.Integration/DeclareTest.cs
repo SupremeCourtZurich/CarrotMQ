@@ -91,23 +91,23 @@ public class DeclareTest
         var declaredClassicQueue = queues?.SingleOrDefault(q => q.Name?.Equals(Queue2Name) ?? false);
         Assert.IsNotNull(declaredClassicQueue);
         Assert.AreEqual("classic", declaredClassicQueue.Type);
-        Assert.AreEqual(true, declaredClassicQueue.Durable);
-        Assert.AreEqual(false, declaredClassicQueue.AutoDelete);
-        Assert.AreEqual(false, declaredClassicQueue.Exclusive);
+        Assert.IsTrue(declaredClassicQueue.Durable);
+        Assert.IsFalse(declaredClassicQueue.AutoDelete);
+        Assert.IsFalse(declaredClassicQueue.Exclusive);
 
         var declaredQuorumQueue = queues?.SingleOrDefault(q => q.Name?.Equals(Queue1Name) ?? false);
         Assert.IsNotNull(declaredQuorumQueue);
         Assert.AreEqual("quorum", declaredQuorumQueue.Type);
-        Assert.AreEqual(true, declaredQuorumQueue.Durable);
-        Assert.AreEqual(false, declaredQuorumQueue.AutoDelete);
-        Assert.AreEqual(false, declaredQuorumQueue.Exclusive);
+        Assert.IsTrue( declaredQuorumQueue.Durable);
+        Assert.IsFalse( declaredQuorumQueue.AutoDelete);
+        Assert.IsFalse( declaredQuorumQueue.Exclusive);
 
         var declaredArgumentTestQueue1 = queues?.SingleOrDefault(q => q.Name?.Equals(Queue3Name) ?? false);
         Assert.IsNotNull(declaredArgumentTestQueue1);
         Assert.AreEqual("classic", declaredArgumentTestQueue1.Type);
-        Assert.AreEqual(false, declaredArgumentTestQueue1.Durable);
-        Assert.AreEqual(false, declaredArgumentTestQueue1.AutoDelete);
-        Assert.AreEqual(true, declaredArgumentTestQueue1.Exclusive);
+        Assert.IsFalse( declaredArgumentTestQueue1.Durable);
+        Assert.IsFalse( declaredArgumentTestQueue1.AutoDelete);
+        Assert.IsTrue( declaredArgumentTestQueue1.Exclusive);
 
         var declaredArgumentTestQueue2 = queues?.SingleOrDefault(q => q.Name?.Equals(Queue4Name) ?? false);
         Assert.IsNotNull(declaredArgumentTestQueue2);

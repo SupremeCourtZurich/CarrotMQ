@@ -91,7 +91,7 @@ public class PublisherRecoveryTest
         ctx.Cancel();
 #endif
 
-        await Assert.ThrowsExceptionAsync<TaskCanceledException>(() => p4).ConfigureAwait(false);
+        await Assert.ThrowsAsync<TaskCanceledException>(() => p4).ConfigureAwait(false);
 
         var allMessagesReceived = await AwaitDistinctMessagesAsync(6, CancellationToken.None).ConfigureAwait(false);
         Assert.IsTrue(allMessagesReceived, nameof(AwaitDistinctMessagesAsync));
