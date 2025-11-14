@@ -83,9 +83,9 @@ public class HandlerConfigurationTest
     [TestMethod]
     public void HandlerConfiguration_AddCommandHandler_DifferentHandlers_With_Same_RequestType_ThrowsException()
     {
+        _handlerCollection.AddCommand<TestCommandHandler, TestCommand, TestResponse>();
         Assert.ThrowsExactly<DuplicateHandlerKeyException>(() =>
         {
-            _handlerCollection.AddCommand<TestCommandHandler, TestCommand, TestResponse>();
             _handlerCollection.AddCommand<TestCommandHandlerBase2, TestCommand, TestResponse>();
         });
     }
