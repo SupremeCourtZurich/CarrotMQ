@@ -66,9 +66,9 @@ public sealed class ExchangeEndPointCmdHandler : CommandHandlerBase<ExchangeEndP
 
         if (cmd.ReturnErrorWithValidationErrors)
         {
-            Dictionary<string, string[]> validations = new() { { "Error1", new[] { "Error1.Message1", "Error1.Message2" } } };
+            Dictionary<string, string[]> validations = new(StringComparer.Ordinal) { { "Error1", new[] { "Error1.Message1", "Error1.Message2" } } };
 
-            return Error($"CustomError {cmd.Id}", new Dictionary<string, string[]>(validations));
+            return Error($"CustomError {cmd.Id}", new Dictionary<string, string[]>(validations, StringComparer.Ordinal));
         }
 
         if (cmd.ReturnCustomStatusCode)

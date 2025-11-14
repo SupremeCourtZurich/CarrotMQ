@@ -37,10 +37,9 @@ public class SubscribeTest
                 var exchange = builder.Exchanges.AddDirect<TestExchange>();
 
                 var queue = builder.Queues.AddQuorum(QueueName)
-                    .WithConsumer(
-                        c => c
-                            .WithPrefetchCount(0)
-                            .WithSingleAck());
+                    .WithConsumer(c => c
+                        .WithPrefetchCount(0)
+                        .WithSingleAck());
 
                 builder.Handlers.AddQuery<TestQueryHandler, TestQuery, TestQuery.Response>()
                     .BindTo(exchange, queue);

@@ -64,7 +64,7 @@ public class MessageDistributorTest
         var deliveryStatus = await _messageDistributor.DistributeAsync(message, CancellationToken.None);
 
         Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus, nameof(DeliveryStatus));
-        Assert.AreEqual(1, s_handledMessages.Count, "handled messages count");
+        Assert.HasCount(1, s_handledMessages, "handled messages count");
         Assert.AreEqual(runId, s_handledMessages.First().RequestRunId, "dto id");
     }
 
@@ -92,7 +92,7 @@ public class MessageDistributorTest
         var deliveryStatus = await _messageDistributor.DistributeAsync(message, CancellationToken.None);
 
         Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus, nameof(DeliveryStatus));
-        Assert.AreEqual(1, s_handledMessages.Count, "handled messages count");
+        Assert.HasCount(1, s_handledMessages, "handled messages count");
     }
 
     [TestMethod]
@@ -112,7 +112,7 @@ public class MessageDistributorTest
         var deliveryStatus = await _messageDistributor.DistributeAsync(message, cts.Token).ConfigureAwait(false);
 
         Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus, nameof(DeliveryStatus));
-        Assert.AreEqual(1, s_handledMessages.Count, "handled messages count");
+        Assert.HasCount(1, s_handledMessages, "handled messages count");
     }
 
     [TestMethod]
@@ -132,7 +132,7 @@ public class MessageDistributorTest
         var deliveryStatus = await _messageDistributor.DistributeAsync(message, CancellationToken.None).ConfigureAwait(false);
 
         Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus, nameof(DeliveryStatus));
-        Assert.AreEqual(1, s_handledMessages.Count, "handled messages count");
+        Assert.HasCount(1, s_handledMessages, "handled messages count");
     }
 
     public class TestCommand : ICommand<TestCommand, TestResponse, TestQueueEndPoint>

@@ -62,7 +62,7 @@ public sealed class BrokerConnectionOptions
     /// <summary>
     /// Dictionary of properties that are sent to the broker (stored on the BrokerConnection)
     /// </summary>
-    public IDictionary<string, object?> ClientProperties { get; set; } = new Dictionary<string, object?>();
+    public IDictionary<string, object?> ClientProperties { get; set; } = new Dictionary<string, object?>(StringComparer.Ordinal);
 
     /// <summary>
     /// Initial connection timeout.

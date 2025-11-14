@@ -28,10 +28,9 @@ public class StartAndStopConsumerTest
                 var exchange = builder.Exchanges.AddDirect<TestExchange>();
 
                 var queue = builder.Queues.AddQuorum(QueueName)
-                    .WithConsumer(
-                        c => c
-                            .WithPrefetchCount(0)
-                            .WithSingleAck());
+                    .WithConsumer(c => c
+                        .WithPrefetchCount(0)
+                        .WithSingleAck());
 
                 builder.Handlers.AddEvent<TestEventHandler, TestEvent>()
                     .BindTo(exchange, queue);

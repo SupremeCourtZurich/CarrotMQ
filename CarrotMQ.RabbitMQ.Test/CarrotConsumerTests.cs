@@ -7,7 +7,6 @@ using CarrotMQ.RabbitMQ.Configuration.Queues;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Test.Helper;
 using Microsoft.Extensions.Options;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 
 namespace CarrotMQ.RabbitMQ.Test;
@@ -29,13 +28,12 @@ public class CarrotConsumerTests
 
         var consumerChannel = Substitute.For<IConsumerChannel>();
         consumerChannel.ApplyConfigurations(Arg.Any<QueueConfiguration>(), Arg.Any<IList<BindingConfiguration>>()).Returns(Task.CompletedTask);
-        consumerChannel.When(
-                c => c.StartConsumingAsync(
-                    Arg.Any<string>(),
-                    Arg.Any<ushort>(),
-                    Arg.Any<ushort>(),
-                    Arg.Any<Func<CarrotMessage, Task<DeliveryStatus>>>(),
-                    Arg.Any<IDictionary<string, object?>?>()))
+        consumerChannel.When(c => c.StartConsumingAsync(
+                Arg.Any<string>(),
+                Arg.Any<ushort>(),
+                Arg.Any<ushort>(),
+                Arg.Any<Func<CarrotMessage, Task<DeliveryStatus>>>(),
+                Arg.Any<IDictionary<string, object?>?>()))
             .Do(info => { _consumeAsyncFunc = info.Arg<Func<CarrotMessage, Task<DeliveryStatus>>>(); });
         _brokerConnection = Substitute.For<IBrokerConnection>();
         _brokerConnection.CreateConsumerChannelAsync().Returns(consumerChannel);
@@ -46,14 +44,13 @@ public class CarrotConsumerTests
     public async Task CarrotConsumer_graceful_shutdown_while_consuming()
     {
         _messageDistributor.DistributeAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .Returns(
-                async _ =>
-                {
-                    _consumerStarted.SetResult(true);
-                    await _messageDistributorDelayTask.Task.ConfigureAwait(false);
+            .Returns(async _ =>
+            {
+                _consumerStarted.SetResult(true);
+                await _messageDistributorDelayTask.Task.ConfigureAwait(false);
 
-                    return DeliveryStatus.Ack;
-                });
+                return DeliveryStatus.Ack;
+            });
         var consumer = CreateConsumer();
 
         // Start consumer
@@ -84,19 +81,18 @@ public class CarrotConsumerTests
     public async Task CarrotConsumer_graceful_shutdown_with_MessageProcessingTimeout()
     {
         _messageDistributor.DistributeAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .Returns(
-                async x =>
+            .Returns(async x =>
+            {
+                _consumerStarted.SetResult(true);
+                var token = x.Arg<CancellationToken>();
+
+                while (!token.IsCancellationRequested)
                 {
-                    _consumerStarted.SetResult(true);
-                    var token = x.Arg<CancellationToken>();
+                    await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
+                }
 
-                    while (token.IsCancellationRequested == false)
-                    {
-                        await Task.Delay(100, CancellationToken.None).ConfigureAwait(false);
-                    }
-
-                    return DeliveryStatus.Ack;
-                });
+                return DeliveryStatus.Ack;
+            });
         var consumer = CreateConsumer(50);
 
         // Start consumer

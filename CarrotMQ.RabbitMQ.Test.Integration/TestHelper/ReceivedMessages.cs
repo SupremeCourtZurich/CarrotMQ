@@ -27,6 +27,4 @@ public sealed class ReceivedMessages
 
         return allItems;
     }
-
-
 }

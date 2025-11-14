@@ -3,7 +3,6 @@ using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NSubstitute;
 using RabbitMQ.Client;
 using IChannel = RabbitMQ.Client.IChannel;
@@ -22,27 +21,25 @@ public class PublisherChannelTests
         var channel = Substitute.For<IChannel>();
         channel.IsOpen.Returns(true);
 
-        channel.When(
-                m => m.BasicPublishAsync(
-                    Arg.Any<string>(),
-                    Arg.Any<string>(),
-                    Arg.Any<bool>(),
-                    Arg.Any<BasicProperties>(),
-                    Arg.Any<ReadOnlyMemory<byte>>(),
-                    Arg.Any<CancellationToken>()))
+        channel.When(m => m.BasicPublishAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<BasicProperties>(),
+                Arg.Any<ReadOnlyMemory<byte>>(),
+                Arg.Any<CancellationToken>()))
             .Do(a => { _basicProperties = a.Arg<BasicProperties>(); });
 
         var connection = Substitute.For<IConnection>();
         connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>())
             .Returns(_ => Task.FromResult(channel));
 
-        using var loggerFactory = LoggerFactory.Create(
-            builder =>
-            {
-                builder
-                    .SetMinimumLevel(LogLevel.Trace)
-                    .AddConsole();
-            });
+        using var loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .SetMinimumLevel(LogLevel.Trace)
+                .AddConsole();
+        });
         _channel = await PublisherChannel.CreateAsync(
                 connection,
                 TimeSpan.FromSeconds(2),

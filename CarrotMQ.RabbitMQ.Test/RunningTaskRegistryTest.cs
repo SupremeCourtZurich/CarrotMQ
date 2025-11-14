@@ -1,5 +1,4 @@
 ﻿using CarrotMQ.RabbitMQ.MessageProcessing;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 

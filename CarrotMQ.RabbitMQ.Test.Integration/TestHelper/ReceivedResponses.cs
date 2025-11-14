@@ -18,7 +18,9 @@ public sealed class ReceivedResponses
     }
 }
 
+#pragma warning disable MA0048 // File name must match type name
 public record Response
+#pragma warning restore MA0048 // File name must match type name
 {
     public int Id { get; set; }
 

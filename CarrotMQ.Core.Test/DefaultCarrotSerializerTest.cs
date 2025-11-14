@@ -26,7 +26,6 @@ public class DefaultCarrotSerializerTest
     }
 
     [TestMethod]
-    [DataTestMethod]
     [DataRow(double.PositiveInfinity)]
     [DataRow(double.NegativeInfinity)]
     [DataRow(double.NaN)]
@@ -40,7 +39,9 @@ public class DefaultCarrotSerializerTest
     }
 }
 
+#pragma warning disable MA0048 // File name must match type name
 public class TestEvent : IEvent<TestEvent, TestExchangeEndPoint>
+#pragma warning restore MA0048 // File name must match type name
 {
     public string TestProp { get; set; } = "prop";
 }

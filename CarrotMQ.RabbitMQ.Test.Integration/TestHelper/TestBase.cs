@@ -107,6 +107,7 @@ public class TestBase
         options.VHost = RabbitMqVhost;
         options.ServiceName = "CarrotMQ.RabbitMQ.Test.Integration";
         options.ConsumerDispatchConcurrency = 1;
+
         return options;
     }
 
@@ -130,9 +131,8 @@ public class TestBase
 
                 var queue1 = builder.Queues.AddQuorum<TestQueue>()
                     .WithDeadLetterExchange(DeadLetterExchange)
-                    .WithConsumer(
-                        c => c.WithPrefetchCount(0)
-                            .WithSingleAck())
+                    .WithConsumer(c => c.WithPrefetchCount(0)
+                        .WithSingleAck())
                     .WithDeliveryLimit(3);
 
                 builder.Handlers.AddCommand<ExchangeEndPointCmdHandler, ExchangeEndPointCmd, ExchangeEndPointCmd.Response>()

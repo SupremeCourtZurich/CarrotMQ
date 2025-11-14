@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="CarrotMQ.sln.DotSettings" />
+    <File Path="nuget.config" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/Solution Items/Pipelines/">
+    <File Path=".github/workflows/build-and-test.yml" />
+    <File Path=".github/workflows/main.yml" />
+    <File Path=".github/workflows/public-docfx-documentation.yml" />
+    <File Path=".github/workflows/publish-nugets.yml" />
+    <File Path=".github/workflows/publish.yml" />
+  </Folder>
+  <Project Path="CarrotMQ.Core.Test/CarrotMQ.Core.Test.csproj" />
+  <Project Path="CarrotMQ.Core/CarrotMQ.Core.csproj" />
+  <Project Path="CarrotMQ.RabbitMQ.Test.Integration/CarrotMQ.RabbitMQ.Test.Integration.csproj" />
+  <Project Path="CarrotMQ.RabbitMQ.Test/CarrotMQ.RabbitMQ.Test.csproj" />
+  <Project Path="CarrotMQ.RabbitMQ/CarrotMQ.RabbitMQ.csproj" />
+  <Project Path="Documentation/Documentation.csproj" />
+</Solution>

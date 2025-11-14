@@ -62,10 +62,7 @@ public class ExchangeEndPointEventTest : TestBaseNoReply
 
         for (int i = startId; i < startId + eventCount; i++)
         {
-            await CarrotClient.PublishAsync(new ExchangeEndPointEvent(i)
-            {
-                BarrierId = barrierId
-            });
+            await CarrotClient.PublishAsync(new ExchangeEndPointEvent(i) { BarrierId = barrierId });
         }
 
         await barrier.SignalAndWaitAsync();

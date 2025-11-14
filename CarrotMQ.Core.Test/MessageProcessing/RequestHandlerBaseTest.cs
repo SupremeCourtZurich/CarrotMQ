@@ -29,7 +29,7 @@ public class RequestHandlerBaseTest
     [TestMethod]
     public void HandlerResponse_BadRequest_WithResponse_Check_ErrorResult_and_StatusCode()
     {
-        var validationErrors = new Dictionary<string, string[]> { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.Ordinal) { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
 
         TestRequestHandler handler = new();
         Response response = new();
@@ -50,7 +50,7 @@ public class RequestHandlerBaseTest
     [TestMethod]
     public void HandlerResponse_BadRequest_WithoutResponse_Check_ErrorResult_and_StatusCode()
     {
-        var validationErrors = new Dictionary<string, string[]> { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.Ordinal) { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
 
         TestRequestHandler handler = new();
 
@@ -70,7 +70,7 @@ public class RequestHandlerBaseTest
     [TestMethod]
     public void HandlerResponse_InternalServerError_WithResponse_Check_ErrorResult_and_StatusCode()
     {
-        var validationErrors = new Dictionary<string, string[]> { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.Ordinal) { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
 
         TestRequestHandler handler = new();
         Response response = new();
@@ -91,7 +91,7 @@ public class RequestHandlerBaseTest
     [TestMethod]
     public void HandlerResponse_InternalServerError_WithoutResponse_Check_ErrorResult_and_StatusCode()
     {
-        var validationErrors = new Dictionary<string, string[]> { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.Ordinal) { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
 
         TestRequestHandler handler = new();
 
@@ -113,7 +113,7 @@ public class RequestHandlerBaseTest
     public void HandlerResponse_CustomErrorCode_WithResponse_Check_ErrorResult_and_StatusCode()
     {
         const int customErrorCode = 23876;
-        var validationErrors = new Dictionary<string, string[]> { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
+        var validationErrors = new Dictionary<string, string[]>(StringComparer.Ordinal) { { "Field1", ["ErrorField1_1", "ErrorField1_2"] } };
 
         TestRequestHandler handler = new();
         Response response = new();

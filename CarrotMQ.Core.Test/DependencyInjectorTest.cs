@@ -16,7 +16,6 @@ public class DependencyInjectorTest
         TestTransport.AllDisposed.Clear();
     }
 
-
     [TestMethod]
     public async Task Disposable_Serializer_IsDisposed()
     {
@@ -31,7 +30,7 @@ public class DependencyInjectorTest
             await dependencyInjector.DisposeAsync();
         }
 
-        Assert.AreEqual(1, DisposableSerializer.AllDisposed.Count);
+        Assert.HasCount(1, DisposableSerializer.AllDisposed);
         Assert.IsTrue(DisposableSerializer.AllDisposed.All(entry => entry.Value), $"Not all {nameof(DisposableSerializer)} have been disposed");
     }
 
@@ -49,7 +48,7 @@ public class DependencyInjectorTest
             _ = scope.GetCarrotSerializer();
         }
 
-        Assert.AreEqual(1, DisposableSerializer.AllDisposed.Count);
+        Assert.HasCount(1, DisposableSerializer.AllDisposed);
         Assert.IsTrue(DisposableSerializer.AllDisposed.All(entry => entry.Value), $"Not all {nameof(DisposableSerializer)} have been disposed");
 
         await dependencyInjector.DisposeAsync();
@@ -69,7 +68,7 @@ public class DependencyInjectorTest
             await dependencyInjector.DisposeAsync();
         }
 
-        Assert.AreEqual(1, AsyncDisposableSerializer.AllDisposed.Count);
+        Assert.HasCount(1, AsyncDisposableSerializer.AllDisposed);
         Assert.IsTrue(AsyncDisposableSerializer.AllDisposed.All(entry => entry.Value), $"Not all {nameof(DisposableSerializer)} have been disposed");
     }
 
@@ -87,7 +86,7 @@ public class DependencyInjectorTest
             _ = scope.GetCarrotSerializer();
         }
 
-        Assert.AreEqual(1, AsyncDisposableSerializer.AllDisposed.Count);
+        Assert.HasCount(1, AsyncDisposableSerializer.AllDisposed);
         Assert.IsTrue(AsyncDisposableSerializer.AllDisposed.All(entry => entry.Value), $"Not all {nameof(DisposableSerializer)} have been disposed");
 
         await dependencyInjector.DisposeAsync();

@@ -28,21 +28,19 @@ public class CarrotClientHeaderTests
     {
         _transport = Substitute.For<ITransport>();
         _transport.SendAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
-            .ReturnsForAnyArgs(
-                x =>
-                {
-                    _resultingMessage = x.Arg<CarrotMessage>();
+            .ReturnsForAnyArgs(x =>
+            {
+                _resultingMessage = x.Arg<CarrotMessage>();
 
-                    return Task.FromResult(new CarrotMessage());
-                });
+                return Task.FromResult(new CarrotMessage());
+            });
         _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), CancellationToken.None)
-            .ReturnsForAnyArgs(
-                x =>
-                {
-                    _resultingMessage = x.Arg<CarrotMessage>();
+            .ReturnsForAnyArgs(x =>
+            {
+                _resultingMessage = x.Arg<CarrotMessage>();
 
-                    return Task.FromResult(new CarrotMessage { Payload = "{}" });
-                });
+                return Task.FromResult(new CarrotMessage { Payload = "{}" });
+            });
 
         _dependencyInjector = Substitute.For<IDependencyInjector>();
         _dependencyInjector.CreateAsyncScope().Returns(_ => _dependencyInjector);
@@ -67,7 +65,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -84,7 +82,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -101,7 +99,7 @@ public class CarrotClientHeaderTests
         Assert.AreEqual(UserName, resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -118,7 +116,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.AreEqual(ServiceName, resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -133,7 +131,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsFalse(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -165,7 +163,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(2, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsFalse(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }
@@ -180,7 +178,7 @@ public class CarrotClientHeaderTests
         Assert.IsNull(resultHeader.InitialUserName, nameof(resultHeader.InitialUserName));
         Assert.IsNull(resultHeader.InitialServiceName, nameof(resultHeader.InitialServiceName));
         Assert.IsTrue(resultHeader.MessageProperties.PublisherConfirm, nameof(resultHeader.MessageProperties.PublisherConfirm));
-        Assert.AreEqual(null, resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
+        Assert.IsNull(resultHeader.MessageProperties.Ttl, nameof(resultHeader.MessageProperties.Ttl));
         Assert.AreEqual(0, resultHeader.MessageProperties.Priority, nameof(resultHeader.MessageProperties.Priority));
         Assert.IsTrue(resultHeader.MessageProperties.Persistent, nameof(resultHeader.MessageProperties.Persistent));
     }

@@ -40,5 +40,5 @@ public sealed class ConsumerConfiguration
     /// <summary>
     /// Custom arguments that will directly be passed to the consumer (<see cref="IConsumerChannel.StartConsumingAsync" />).
     /// </summary>
-    public IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>();
+    public IDictionary<string, object?> Arguments { get; set; } = new Dictionary<string, object?>(StringComparer.Ordinal);
 }
