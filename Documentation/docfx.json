@@ -1,65 +1,66 @@
 {
-  "metadata": [
-    {
-      // Projects for which to build xml documentation
-      "src": [
+    "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+    "metadata": [
         {
-          "src": "./../",
-            "files": [
-                "CarrotMQ.Core/bin/Release/net10.0/CarrotMQ.Core.dll",
-                "CarrotMQ.RabbitMQ/bin/Release/net10.0/CarrotMQ.RabbitMQ.dll"
+            // Projects for which to build xml documentation
+            "src": [
+                {
+                    "src": "./../",
+                    "files": [
+                        "CarrotMQ.Core/bin/Release/net10.0/CarrotMQ.Core.dll",
+                        "CarrotMQ.RabbitMQ/bin/Release/net10.0/CarrotMQ.RabbitMQ.dll"
+                    ],
+                    "exclude": []
+                }
             ],
-            "exclude": []
+            "dest": "xmlDoc"
+            //Destination folder for XML documentation
         }
-      ],
-      "dest": "xmlDoc"
-      //Destination folder for XML documentation
-    }
-  ],
-  "build": {
-    "content": [
-      {
-        // Files to include for documentation generation
-        "files": [
-          "**/*.md",
-          // All Markdown files
-          "**/*.yml"
+    ],
+    "build": {
+        "content": [
+            {
+                // Files to include for documentation generation
+                "files": [
+                    "**/*.md",
+                    // All Markdown files
+                    "**/*.yml"
+                ],
+                "exclude": [
+                    "_site/**"
+                ]
+            }
         ],
-        "exclude": [
-          "_site/**"
-        ]
-      }
-    ],
-    // use internal instance for plantUml diagram generation
-    "markdownEngineProperties": {
-        "plantUml": {
-            "outputFormat": "svg",
-            "remoteUrl": "http://www.plantuml.com/plantuml/",
-            "renderingMode": "remote"
+        // use internal instance for plantUml diagram generation
+        "markdownEngineProperties": {
+            "plantUml": {
+                "outputFormat": "Svg",
+                "remoteUrl": "http://www.plantuml.com/plantuml/",
+                "renderingMode": "Remote"
+            }
+        },
+        // include additional files (these will be copied to the _site folder
+        "resource": [
+            {
+                "files": [
+                    "**/images/**"
+                    // Copy all files from /images/ folders
+                ]
+            }
+        ],
+        "output": "_site",
+        // output folder for the generated static documentation website 
+        "template": [
+            "default",
+            "modern",
+            "template"
+        ],
+        "globalMetadata": {
+            "_appName": "CarrotMQ",
+            "_appTitle": "CarrotMQ",
+            "_appFooter": "Copyright © Supreme Court of the Canton of Zurich",
+            "_enableSearch": true,
+            "pdf": false
         }
-    },
-    // include additional files (these will be copied to the _site folder
-    "resource": [
-      {
-        "files": [
-          "**/images/**"
-          // Copy all files from /images/ folders
-        ]
-      }
-    ],
-    "output": "_site",
-    // output folder for the generated static documentation website 
-    "template": [
-      "default",
-      "modern",
-      "template"
-    ],
-    "globalMetadata": {
-        "_appName": "CarrotMQ",
-        "_appTitle": "CarrotMQ",
-        "_appFooter": "Copyright © Supreme Court of the Canton of Zurich",
-        "_enableSearch": true,
-        "pdf": false
     }
-  }
 }
