@@ -5,16 +5,11 @@
       "src": [
         {
           "src": "./../",
-          "files": [
-            "CarrotMQ.Core/*.csproj",
-            "CarrotMQ.RabbitMQ/*.csproj"
-          ],
-            "exclude": [
-                // Exclude UnitTest and Documentation projects,
-                "**/*.Test.csproj",
-                "**/*.Test.*.csproj",
-                "Documentation/Documentation.csproj"
-            ]
+            "files": [
+                "CarrotMQ.Core/bin/Release/net10.0/CarrotMQ.Core.dll",
+                "CarrotMQ.RabbitMQ/bin/Release/net10.0/CarrotMQ.RabbitMQ.dll"
+            ],
+            "exclude": []
         }
       ],
       "dest": "xmlDoc"
@@ -24,7 +19,7 @@
   "build": {
     "content": [
       {
-        // Files to iunclude for documentation generation
+        // Files to include for documentation generation
         "files": [
           "**/*.md",
           // All Markdown files
