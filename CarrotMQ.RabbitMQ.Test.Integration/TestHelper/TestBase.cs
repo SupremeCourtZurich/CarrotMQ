@@ -41,8 +41,7 @@ public class TestBase
     [AssemblyInitialize]
     public static async Task AssemblyInitialize(TestContext context)
     {
-        s_rabbitContainer = new RabbitMqBuilder()
-            .WithImage("rabbitmq:4.0-management")
+        s_rabbitContainer = new RabbitMqBuilder("rabbitmq:4.2-management")
             .WithUsername(RabbitMqContainerUsername)
             .WithPassword(RabbitMqContainerPassword)
             .WithExposedPort(5672)
