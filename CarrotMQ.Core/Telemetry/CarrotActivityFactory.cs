@@ -72,7 +72,8 @@ public static class CarrotActivityFactory
         string vhost,
         IOptions<CarrotTracingOptions> carrotTracingOptions)
     {
-        var activity = ActivitySource.StartActivity(header.CalledMethod, ActivityKind.Producer);
+        var parentContext = CreateParentContext(header);
+        var activity = ActivitySource.StartActivity(header.CalledMethod, ActivityKind.Producer, parentContext);
 
         if (activity != null)
         {
