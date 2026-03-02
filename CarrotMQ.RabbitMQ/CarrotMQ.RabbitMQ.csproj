@@ -34,12 +34,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="meziantou.analyzer" Version="2.0.298">
+        <PackageReference Include="meziantou.analyzer" Version="3.0.18">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.102">
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.103">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
@@ -47,7 +47,7 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="RabbitMQ.Client" Version="7.2.0" />
+        <PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
     </ItemGroup>
 
     <ItemGroup>
