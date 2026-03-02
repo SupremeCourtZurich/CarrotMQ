@@ -6,7 +6,7 @@ using CarrotMQ.Core.Protocol;
 namespace CarrotMQ.Core.Handlers;
 
 /// <summary>
-/// Base class for <see cref="QueryHandlerBase{TQuery,TResponse}" /> and
+/// Base class for <see cref="CommandHandlerBase{TCommand,TResponse}" /> and
 /// <see cref="QueryHandlerBase{TQuery,TResponse}" />.
 /// </summary>
 /// <typeparam name="TRequest">The type of the request being handled.</typeparam>
