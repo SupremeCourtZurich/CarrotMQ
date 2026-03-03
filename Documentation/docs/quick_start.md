@@ -1,4 +1,7 @@
-﻿## Quick Start 
+﻿## Quick Start
+
+This guide walks you through a minimal end-to-end example: publishing an event from a **Client** application and
+consuming it in a **Microservice**. By the end you will have a working CarrotMQ setup you can build on.
 
 For this quick start example, we will create 3 separate projects:
 
@@ -75,3 +78,10 @@ The configuration is similar to the microservice project without creating exchan
 
 [!code-csharp[](../../Examples/QuickStart/Client/Program.cs#BootstrappingClient)]
 Here we directly get the ICarrotClient out of the ServiceCollection, in a real application you can let the DI inject the ICarrotClient interface in your services.
+
+## Next Steps
+
+- [Core Concepts](concepts/overview.md) — understand the architecture and message types
+- [Commands & Queries](guides/commands_queries.md) — add request/response messaging
+- [Configuration Reference](configuration/setup.md) — configure exchanges, queues, and consumers
+- [Middleware](guides/middleware.md) — add cross-cutting concerns
