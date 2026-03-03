@@ -41,12 +41,11 @@ builder.ConfigureTracing(sectionName: "CustomTracingSection");
       "RetryIntervalInMs": 1000,
       "RepublishEvaluationIntervalInMs": 100
     }
-  },
-  "CarrotTracing": {}
+  }
 }
 ```
 
-> **Note**: The `CarrotTracing` section exists to allow section name resolution and future string-based properties. Its enrichment hooks (`EnrichPublishActivityWithHeader`, `EnrichConsumeActivityWithHeader`) are delegate properties and **cannot be set from JSON** — configure them in code via `builder.ConfigureTracing(configureOptions: ...)`. See [OpenTelemetry](../observability/opentelemetry.md) for details.
+> **Note**: The `CarrotTracing` options only contain enrichment hooks (`EnrichPublishActivityWithHeader`, `EnrichConsumeActivityWithHeader`) which are delegate properties and **cannot be set from JSON** — configure them in code via `builder.ConfigureTracing(configureOptions: ...)`. See [OpenTelemetry](../observability/opentelemetry.md) for details.
 
 ---
 

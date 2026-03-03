@@ -43,9 +43,6 @@ appBuilder.Services.AddOpenTelemetry()
     })
     .UseOtlpExporter(); // or your preferred exporter
 ```
-
-> **Tip**: Replace `.UseOtlpExporter()` with the exporter appropriate for your observability backend (e.g. `AddJaegerExporter()`, `AddZipkinExporter()`, `AddPrometheusExporter()`).
-
 ---
 
 ## Tracing Customisation via CarrotTracingOptions
@@ -68,20 +65,6 @@ builder.ConfigureTracing(configureOptions: options =>
     };
 });
 ```
-
-### Configuration via appsettings.json
-
-The `CarrotTracing` section is read from configuration, but because `EnrichPublishActivityWithHeader` and `EnrichConsumeActivityWithHeader` are delegate properties, they **cannot be set from JSON** — they must always be configured in code as shown above.
-
-```json
-{
-  "CarrotTracing": {}
-}
-```
-
-See [AppSettings Reference](../advanced/appsettings.md) for section name customisation.
-
----
 
 ## Enrichment Hooks
 
