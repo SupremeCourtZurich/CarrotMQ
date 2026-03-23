@@ -1,5 +1,4 @@
-{
-    "$schema": "https://raw.githubusercontent.com/dotnet/docfx/main/schemas/docfx.schema.json",
+    {
     "metadata": [
         {
             // Projects for which to build xml documentation
@@ -34,9 +33,9 @@
         // use internal instance for plantUml diagram generation
         "markdownEngineProperties": {
             "plantUml": {
-                "outputFormat": "Svg",
+                "outputFormat": "svg",
                 "remoteUrl": "http://www.plantuml.com/plantuml/",
-                "renderingMode": "Remote"
+                "renderingMode": "remote"
             }
         },
         // include additional files (these will be copied to the _site folder
