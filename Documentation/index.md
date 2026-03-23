@@ -1,13 +1,37 @@
-## CarrotMQ
+# CarrotMQ
 
-Welcome to the Carrot documentation. This document provides an overview of the core types and functionalities included
-in the CarrotMQ.Core and CarrotMQ.RabbitMQ NuGet packages.
+CarrotMQ is a .NET library for building microservices over RabbitMQ with a clean, CQRS-inspired messaging model.
+It is designed for teams that want strongly-typed, DI-friendly message passing without boilerplate, making it easy to
+define events, commands, and queries as plain C# classes and wire them up to RabbitMQ exchanges and queues.
 
-## Overview
+## Features
 
-*CarrotMQ.Core* is a transport-agnostic library that defines the essential interfaces and base classes required for creating and handling messages within an AMQP messaging system.
-This package is designed to be flexible and extensible with the potential for implementation with other AMQP-based transport layers.
+- **CQRS-inspired messaging** — define events, commands, and queries as plain C# classes
+- **Strongly-typed message routing** — endpoints and message targets defined in C# types; no magic strings
+- **Full .NET Dependency Injection integration** — register handlers and services with `IServiceCollection`
+- **Async-first API** built on top of the official `RabbitMQ.Client`
+- **Middleware pipeline** for cross-cutting concerns (logging, tracing, validation)
+- **Publisher confirms** for at-least-once delivery guarantees
+- **Built-in OpenTelemetry support** — distributed traces and metrics out of the box
+- **Flexible topology** — quorum queues, classic queues, dead-letter exchanges, topic and fanout exchanges
 
-*CarrotMQ.RabbitMQ* is the implementation of the RabbitMQ Transport for CarrotMQ.Core.
+## Packages
+
+| Package | Description |
+|---|---|
+| **CarrotMQ.Core** | Transport-agnostic contracts: interfaces, base classes, and DTO types. Reference this in your shared DTO library. |
+| **CarrotMQ.RabbitMQ** | RabbitMQ implementation. Reference this in your microservice and client projects. |
+
+Both packages are available on [nuget.org](https://www.nuget.org).
+
+## Getting Started
+
+Follow the [Quick Start](docs/quick_start.md) guide to set up a minimal event publishing and consuming scenario in minutes.
+
+## Learn More
+
+- [Core Concepts](docs/concepts/overview.md) — architecture, message types, and the handler pipeline
+- [Configuration Reference](docs/configuration/setup.md) — configure exchanges, queues, consumers, and connection settings
+- [Observability](docs/observability/opentelemetry.md) — OpenTelemetry traces and metrics integration
 
 

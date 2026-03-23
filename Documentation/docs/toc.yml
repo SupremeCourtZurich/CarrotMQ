@@ -1,4 +1,58 @@
-- name: Index
+- name: Home
   href: ../index.md
 - name: Quick Start
-  href: ./quick_start.md
+  href: quick_start.md
+- name: Concepts
+  items:
+  - name: Overview
+    href: concepts/overview.md
+  - name: Message Types
+    href: concepts/message_types.md
+  - name: Endpoints
+    href: concepts/endpoints.md
+  - name: Handler Results
+    href: concepts/handler_results.md
+- name: Guides
+  items:
+  - name: Publishing Events
+    href: guides/publishing_events.md
+  - name: Commands & Queries
+    href: guides/commands_queries.md
+  - name: Response Handling
+    href: guides/response_handling.md
+  - name: Subscriptions
+    href: guides/subscriptions.md
+  - name: Middleware
+    href: guides/middleware.md
+  - name: Message Enricher
+    href: guides/message_enricher.md
+  - name: Error Handling
+    href: guides/error_handling.md
+  - name: Dead-Letter Queue
+    href: guides/dead_letter_queue.md
+- name: Configuration
+  items:
+  - name: Setup & Bootstrap
+    href: configuration/setup.md
+  - name: Broker Connection
+    href: configuration/broker_connection.md
+  - name: Exchanges
+    href: configuration/exchanges.md
+  - name: Queues
+    href: configuration/queues.md
+  - name: Consumer Configuration
+    href: configuration/consumer_configuration.md
+  - name: Publisher Confirms
+    href: configuration/publisher_confirms.md
+  - name: Connection Lifecycle
+    href: configuration/connection_lifecycle.md
+- name: Observability
+  items:
+  - name: OpenTelemetry
+    href: observability/opentelemetry.md
+- name: Advanced
+  items:
+  - name: Custom Routing Events
+    href: advanced/custom_routing_events.md
+  - name: AppSettings Reference
+    href: advanced/appsettings.md
