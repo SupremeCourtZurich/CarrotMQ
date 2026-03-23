@@ -25,17 +25,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Dotnet Setup
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 10.x
 
+    - run: dotnet build -c Release -f net10.0 CarrotMQ.Core/CarrotMQ.Core.csproj
+    - run: dotnet build -c Release -f net10.0 CarrotMQ.RabbitMQ/CarrotMQ.RabbitMQ.csproj
     - run: dotnet tool update -g docfx
     - run: docfx Documentation/docfx.json
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v4
       with:
         # Upload entire repository
         path: 'Documentation/_site'
