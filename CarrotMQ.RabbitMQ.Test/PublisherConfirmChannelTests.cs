@@ -164,7 +164,7 @@ public class PublisherConfirmChannelTests
         var tasks = PublishAsync(noOfMessages, CancellationToken.None);
 
         // 2) AckAsync all messages
-        Parallel.For(1, noOfMessages + 1, index => AckMessage((ulong)index));
+        AckMessagesInParallel(noOfMessages);
 
         // verify
         await VerifyBasicPublishAsync(noOfMessages).ConfigureAwait(false);
@@ -367,6 +367,34 @@ public class PublisherConfirmChannelTests
                 Arg.Any<ReadOnlyMemory<byte>>(),
                 Arg.Any<CancellationToken>())
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Acknowledges <paramref name="noOfMessages" /> messages concurrently from dedicated threads.
+    /// NSubstitute blocks the raising thread until the async event handler completes, so the raising
+    /// threads must stay off the thread pool — the handler continuations need those threads.
+    /// </summary>
+    private void AckMessagesInParallel(int noOfMessages)
+    {
+        const int parallelism = 8;
+
+        var threads = Enumerable.Range(0, parallelism)
+            .Select(
+                offset => new Thread(
+                    () =>
+                    {
+                        for (var deliveryTag = offset + 1; deliveryTag <= noOfMessages; deliveryTag += parallelism)
+                        {
+                            AckMessage((ulong)deliveryTag);
+                        }
+                    })
+                {
+                    IsBackground = true,
+                })
+            .ToArray();
+
+        foreach (var thread in threads) thread.Start();
+        foreach (var thread in threads) thread.Join();
     }
 
     private void AckMessage(ulong deliveryTag, bool multiAck = false)
