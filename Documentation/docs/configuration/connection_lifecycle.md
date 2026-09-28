@@ -69,6 +69,15 @@ CarrotMQ uses the `RabbitMQ.Client` built-in automatic recovery. When the TCP co
 
 This happens transparently — no CarrotMQ code is involved. A `Connection shut down` warning is logged when the connection drops, and `AutoRecovering connection succeeded` is logged when recovery completes.
 
+### Inspecting the connection state
+
+`IBrokerConnection.CurrentConnection` returns the underlying `IConnection` without connecting or waiting. It is `null` before the first `ConnectAsync()` and after `CloseAsync()`; during automatic recovery its `IsOpen` is `false`. Use it for health checks — `ConnectAsync()` would open a connection when there is none and, during an outage, wait until the broker is back.
+
+```csharp
+var connection = brokerConnection.CurrentConnection;
+var healthy = connection is { IsOpen: true };
+```
+
 ### Channel-level recovery (AMQP errors)
 
 AMQP errors with a reply code ≥ 400 close the channel without closing the connection. CarrotMQ's `CarrotChannel` layer detects these and runs its own channel recovery loop, reopening the channel and resuming operation.

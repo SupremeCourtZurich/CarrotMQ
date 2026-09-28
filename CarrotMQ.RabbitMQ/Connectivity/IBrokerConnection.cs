@@ -44,6 +44,16 @@ public interface IBrokerConnection : IAsyncDisposable
     TimeSpan NetworkRecoveryInterval { get; }
 
     /// <summary>
+    /// The current RabbitMQ connection, without connecting or waiting for it to open.
+    /// </summary>
+    /// <value>
+    /// The underlying connection, or <c>null</c> before <see cref="ConnectAsync" /> has created one and after
+    /// <see cref="CloseAsync" />. <see cref="IConnection.IsOpen" /> is <c>false</c> while automatic recovery runs.
+    /// </value>
+    /// <remarks>Intended for state inspection such as health checks; use <see cref="ConnectAsync" /> to obtain a usable connection.</remarks>
+    IConnection? CurrentConnection { get; }
+
+    /// <summary>
     /// Event triggered before brokerConnection is closed
     /// </summary>
     event AsyncEventHandler<EventArgs>? ConnectionClosing;
