@@ -82,6 +82,9 @@ public sealed class BrokerConnection : IBrokerConnection
     public TimeSpan NetworkRecoveryInterval { get; private set; }
 
     /// <inheritdoc />
+    public IConnection? CurrentConnection => Volatile.Read(ref _connection);
+
+    /// <inheritdoc />
     public event Core.Common.AsyncEventHandler<EventArgs>? ConnectionClosing;
 
     /// <inheritdoc />

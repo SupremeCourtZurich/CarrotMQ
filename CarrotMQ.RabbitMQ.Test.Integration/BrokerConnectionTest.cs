@@ -69,6 +69,23 @@ public sealed class BrokerConnectionTest
         Assert.IsTrue(consumerChannel2.IsOpen, "Consumer channel should be open");
     }
 
+    [TestMethod]
+    [Timeout(30_000)]
+    public async Task CurrentConnection_Tracks_Connect_And_Close()
+    {
+        // Let the hosted service finish its own connect first, so it cannot reconnect behind the close below.
+        await _carrotHelper.WaitForConsumerHostBootstrapToCompleteAsync().ConfigureAwait(false);
+
+        var connection = await _brokerConnection.ConnectAsync().ConfigureAwait(false);
+
+        Assert.AreSame(connection, _brokerConnection.CurrentConnection);
+        Assert.IsTrue(_brokerConnection.CurrentConnection!.IsOpen, "Current connection should be open");
+
+        await _brokerConnection.CloseAsync().ConfigureAwait(false);
+
+        Assert.IsNull(_brokerConnection.CurrentConnection, "No connection expected after close");
+    }
+
     [TestCleanup]
     public void Cleanup()
     {
