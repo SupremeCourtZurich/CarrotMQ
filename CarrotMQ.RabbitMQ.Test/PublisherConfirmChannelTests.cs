@@ -257,7 +257,7 @@ public class PublisherConfirmChannelTests
 
         // 2) Try Publish 1 message
         using var publishEvent = new AutoResetEvent(false);
-        _channel.When(m => m.BasicPublishAsync(
+        _channel.When(m => _ = m.BasicPublishAsync(
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<bool>(),

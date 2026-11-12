@@ -36,7 +36,7 @@ public class ConsumerChannelTest
                 TestLoggerFactory.Instance)
             .ConfigureAwait(false);
 
-        channel.When(c => c.BasicRejectAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()))
+        channel.When(c => _ = c.BasicRejectAsync(Arg.Any<ulong>(), Arg.Any<bool>(), Arg.Any<CancellationToken>()))
             .Do(info => { _rejectedMessages.Add(info.Arg<ulong>()); });
 
         _brokerConnection = Substitute.For<IBrokerConnection>();

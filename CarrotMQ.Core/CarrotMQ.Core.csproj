@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0;net9.0;net8.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net11.0;net10.0;net9.0;net8.0;netstandard2.0</TargetFrameworks>
         <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
 
@@ -32,21 +32,32 @@
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <MicrosoftExtensionsVersion>11.0.0</MicrosoftExtensionsVersion>
+        <SourceLinkVersion>11.0.100</SourceLinkVersion>
+    </PropertyGroup>
+
+    <!-- Microsoft.Extensions.* and SourceLink 11.x support net10.0+ only, so net8.0/net9.0 use 10.x. -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'">
+        <MicrosoftExtensionsVersion>10.0.15</MicrosoftExtensionsVersion>
+        <SourceLinkVersion>10.0.404</SourceLinkVersion>
+    </PropertyGroup>
+
     <ItemGroup>
-        <PackageReference Include="meziantou.analyzer" Version="3.0.147">
+        <PackageReference Include="meziantou.analyzer" Version="3.0.325">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400">
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(MicrosoftExtensionsVersion)" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="$(SourceLinkVersion)">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="MinVer" Version="7.0.0">
+        <PackageReference Include="MinVer" Version="8.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="System.Text.Json" Version="10.0.11" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+        <PackageReference Include="System.Text.Json" Version="$(MicrosoftExtensionsVersion)" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     </ItemGroup>
 
     <ItemGroup>

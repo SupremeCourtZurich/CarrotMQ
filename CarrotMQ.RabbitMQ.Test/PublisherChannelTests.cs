@@ -21,7 +21,7 @@ public class PublisherChannelTests
         var channel = Substitute.For<IChannel>();
         channel.IsOpen.Returns(true);
 
-        channel.When(m => m.BasicPublishAsync(
+        channel.When(m => _ = m.BasicPublishAsync(
                 Arg.Any<string>(),
                 Arg.Any<string>(),
                 Arg.Any<bool>(),
