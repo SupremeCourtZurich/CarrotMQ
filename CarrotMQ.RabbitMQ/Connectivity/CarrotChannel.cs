@@ -18,15 +18,13 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 /// <inheritdoc />
 internal class CarrotChannel : ICarrotChannel
 {
-    private readonly TimeSpan _networkRecoveryInterval;
-
     protected CarrotChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        _networkRecoveryInterval = networkRecoveryInterval;
+        NetworkRecoveryInterval = networkRecoveryInterval;
         Connection = connection;
         ProtocolSerializer = protocolSerializer;
         Logger = loggerFactory.CreateLogger<CarrotChannel>();
@@ -37,6 +35,13 @@ internal class CarrotChannel : ICarrotChannel
     protected AsyncLock ChannelLock { get; } = new();
 
     protected ILogger Logger { get; }
+
+    protected TimeSpan NetworkRecoveryInterval { get; }
+
+    /// <summary>
+    /// The reason of the last shutdown of <see cref="Channel" />, or <c>null</c> before the first one.
+    /// </summary>
+    protected ShutdownEventArgs? LastShutdownReason { get; private set; }
 
     /// <summary>
     /// The underlying RabbitMQ channel for communication.
@@ -265,6 +270,7 @@ internal class CarrotChannel : ICarrotChannel
         if (IsDisposed) return Task.CompletedTask;
 
         Logger.LogInformation("Channel shutdown. Reason: {ReplyCode}:{ReplyText}", shutdownEventArgs.ReplyCode, shutdownEventArgs.ReplyText);
+        LastShutdownReason = shutdownEventArgs;
 
         OnTransportErrorReceived(
             new TransportErrorReceivedEventArgs { ErrorReason = TransportErrorReceivedEventArgs.TransportErrorReason.ChannelInterrupted });
@@ -294,7 +300,7 @@ internal class CarrotChannel : ICarrotChannel
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "AMQP channel recovery failed -> retry");
-                    await Task.Delay(_networkRecoveryInterval)
+                    await Task.Delay(NetworkRecoveryInterval)
                         .ConfigureAwait(false); // Avoid floading RabbitMQ when something is wrong
                 }
             }

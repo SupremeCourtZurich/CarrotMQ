@@ -28,4 +28,10 @@ public sealed class PublisherConfirmOptions
     /// <see cref="RetryLimit" />
     /// </summary>
     public uint RepublishEvaluationIntervalInMs { get; set; } = 100;
+
+    /// <summary>
+    /// Milliseconds without activity after which the channels used to republish refused messages are closed; also the
+    /// longest time they wait for the reply to a request before publishing the next message.
+    /// </summary>
+    public uint RecoveryChannelIdleTimeoutInMs { get; set; } = 60_000;
 }

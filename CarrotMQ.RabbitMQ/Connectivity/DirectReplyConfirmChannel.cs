@@ -106,6 +106,20 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         await Channel!.BasicConsumeAsync(QueueName, AutoAck, consumer).ConfigureAwait(false);
     }
 
+    protected override async Task OnRecoveryChannelCreatedAsync(IChannel channel)
+    {
+        var consumer = new AsyncEventingBasicConsumer(channel);
+        consumer.ReceivedAsync += ConsumeAsync;
+        await channel.BasicConsumeAsync(QueueName, AutoAck, consumer).ConfigureAwait(false);
+    }
+
+    protected override Task WaitForReplyAsync(CarrotHeader header)
+    {
+        return header.CorrelationId is { } correlationId && _replyMapper.TryGetValue(correlationId, out var reply)
+            ? reply.Task
+            : Task.CompletedTask;
+    }
+
     private Task ConsumeAsync(object sender, BasicDeliverEventArgs eventArgs)
     {
         var correlationId = new Guid(eventArgs.BasicProperties.CorrelationId ?? string.Empty);

@@ -44,6 +44,30 @@ public class RabbitApi : IDisposable
         await _httpClient.SendAsync(request).ConfigureAwait(false);
     }
 
+    public async Task DeclareExchangeAsync(string exchange, string type, bool isInternal = false)
+    {
+        var body = JsonSerializer.Serialize(new { type, durable = false, auto_delete = false, @internal = isInternal });
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/exchanges/{_vHost}/{exchange}");
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        var responseMessage = await _httpClient.SendAsync(request).ConfigureAwait(false);
+        responseMessage.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteExchangeAsync(string exchange)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/exchanges/{_vHost}/{exchange}");
+        await _httpClient.SendAsync(request).ConfigureAwait(false);
+    }
+
+    public async Task BindExchangeAsync(string source, string destination, string routingKey)
+    {
+        var body = JsonSerializer.Serialize(new { routing_key = routingKey });
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/bindings/{_vHost}/e/{source}/e/{destination}");
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        var responseMessage = await _httpClient.SendAsync(request).ConfigureAwait(false);
+        responseMessage.EnsureSuccessStatusCode();
+    }
+
     public async Task PurgeQueueAsync(string queue)
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/queues/{_vHost}/{queue}/contents");
