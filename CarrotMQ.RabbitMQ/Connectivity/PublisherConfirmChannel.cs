@@ -23,9 +23,12 @@ internal class PublisherConfirmChannel : PublisherChannel
     private readonly ConcurrentDictionary<ulong, PublisherConfirmMessage> _outstandingConfirms = new();
     private readonly SemaphoreSlim _outstandingConfirmsCount;
     private readonly ConcurrentQueue<PublisherConfirmMessage> _republishQueue = new();
+    private readonly uint _recoveryChannelIdleTimeoutInMs;
     private readonly uint _retryIntervalInMs;
     private readonly AsyncLock _tailSeqNoLock = new();
     private readonly IIntervalTimer _timer;
+    private PublishRecoveryChannel? _recoveryChannel;
+    private bool _recoveryChannelDisposed;
 
     /// <summary>
     /// Sequence number of the latest published message
@@ -54,6 +57,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         _outstandingConfirmsCount = new SemaphoreSlim(options.MaxConcurrentConfirms);
         _retryIntervalInMs = options.RetryIntervalInMs;
         _maxRetries = options.RetryLimit;
+        _recoveryChannelIdleTimeoutInMs = options.RecoveryChannelIdleTimeoutInMs;
     }
 
     protected override CreateChannelOptions CreateChannelOptions()
@@ -172,19 +176,45 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override async Task CreateChannelAsync()
     {
+        var closedByRefusal = PublishRecoveryChannel.IsPublishRefusal(LastShutdownReason);
         await base.CreateChannelAsync().ConfigureAwait(false);
 
         Channel!.BasicAcksAsync += BasicAcksAsync;
         Channel!.BasicNacksAsync += BasicNacksAsync;
         Channel!.BasicReturnAsync += BasicReturnAsync;
 
-        await FlagAllMessagesForRepublishAsync().ConfigureAwait(false);
+        await FlagAllMessagesForRepublishAsync(closedByRefusal).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Called after the recovery channel was opened, before anything is published on it.
+    /// </summary>
+    protected virtual Task OnRecoveryChannelCreatedAsync(IChannel channel)
+    {
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Completes when the reply to a request confirmed on a recovery channel has arrived or is no longer awaited.
+    /// </summary>
+    protected virtual Task WaitForReplyAsync(CarrotHeader header)
+    {
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
         _timer.Dispose();
+
+        PublishRecoveryChannel? recoveryChannel;
+        using (await _tailSeqNoLock.LockAsync().ConfigureAwait(false))
+        {
+            _recoveryChannelDisposed = true;
+            recoveryChannel = _recoveryChannel;
+        }
+
+        if (recoveryChannel != null) await recoveryChannel.DisposeAsync().ConfigureAwait(false);
         _outstandingConfirmsCount.Dispose();
         await base.DisposeAsync().ConfigureAwait(false);
     }
@@ -266,10 +296,11 @@ internal class PublisherConfirmChannel : PublisherChannel
     }
 
     /// <summary>
-    /// Move all messages from <see cref="_outstandingConfirms" /> to <see cref="_republishQueue" />
+    /// Move all messages from <see cref="_outstandingConfirms" /> to <see cref="_republishQueue" />, or to the recovery
+    /// channel when the broker closed the channel over a refused publish.
     /// This happens after a channel shutdown --> all messages have to be republished with a new sequence number
     /// </summary>
-    private async Task FlagAllMessagesForRepublishAsync()
+    private async Task FlagAllMessagesForRepublishAsync(bool toRecoveryChannel)
     {
         using var scope = await _tailSeqNoLock.LockAsync().ConfigureAwait(false);
         var oldTailSeqNo = _tailSeqNo;
@@ -278,11 +309,38 @@ internal class PublisherConfirmChannel : PublisherChannel
         _lastPublishedSeqNo = 0;
         for (; oldTailSeqNo <= oldHeadSeqNo; oldTailSeqNo++)
         {
-            if (_outstandingConfirms.TryRemove(oldTailSeqNo, out var oldestOutstandingConfirm))
+            if (!_outstandingConfirms.TryRemove(oldTailSeqNo, out var oldestOutstandingConfirm)) continue;
+
+            if (toRecoveryChannel && !_recoveryChannelDisposed)
+            {
+                GetRecoveryChannel().Enqueue(oldestOutstandingConfirm);
+            }
+            else
             {
                 _republishQueue.Enqueue(oldestOutstandingConfirm);
             }
         }
+    }
+
+    // Called under _tailSeqNoLock only.
+    private PublishRecoveryChannel GetRecoveryChannel()
+    {
+        return _recoveryChannel ??= new PublishRecoveryChannel(
+            Connection,
+            CreateChannelOptions(),
+            _maxRetries,
+            ToDelay(_retryIntervalInMs),
+            NetworkRecoveryInterval,
+            ToDelay(_recoveryChannelIdleTimeoutInMs),
+            OnRecoveryChannelCreatedAsync,
+            WaitForReplyAsync,
+            Logger);
+    }
+
+    // Task.Delay and SemaphoreSlim.WaitAsync accept 1 ms to int.MaxValue ms.
+    private static TimeSpan ToDelay(uint milliseconds)
+    {
+        return TimeSpan.FromMilliseconds(Math.Min(Math.Max(milliseconds, 1u), int.MaxValue));
     }
 
     private async Task RepublishOnTimedEventAsync()

@@ -18,6 +18,7 @@ Publisher confirm behaviour is controlled through `PublisherConfirmOptions`, nes
 | `RetryLimit` | 100 | How many times to retry publishing a message if no positive ack is received from the broker. |
 | `RetryIntervalInMs` | 1000 | Milliseconds to wait between retry attempts. |
 | `RepublishEvaluationIntervalInMs` | 100 | How often (in milliseconds) CarrotMQ checks internally for messages that need to be retried. |
+| `RecoveryChannelIdleTimeoutInMs` | 60000 | Milliseconds without work after which the channels used for [refused publishes](#refused-publishes) are closed; also the longest wait there for a request's reply before the next message is published. |
 
 ---
 
@@ -75,7 +76,7 @@ await carrotClient.PublishAsync(
 The exception occurs in the following sequence:
 
 1. A message is published with `MessageProperties.PublisherConfirm = true` (the default).
-2. The broker sends a NACK (negative acknowledgement) or the confirmation times out.
+2. The broker sends a NACK (negative acknowledgement), the confirmation times out, or the broker refuses the publish (see [Refused Publishes](#refused-publishes)).
 3. CarrotMQ enqueues the message for republishing and increments an internal retry counter.
 4. Once the counter exceeds `PublisherConfirmOptions.RetryLimit`, the exception is raised to the caller.
 
@@ -99,6 +100,12 @@ catch (RetryLimitExceededException ex)
 ### When Publisher Confirms Are Disabled
 
 If you disable publisher confirms via `MessageProperties { PublisherConfirm = false }`, `RetryLimitExceededException` is never thrown for that message. The broker does not acknowledge the send, and CarrotMQ returns immediately after dispatching.
+
+---
+
+## Refused Publishes
+
+When the broker refuses a publish, for example because the exchange does not exist (404), it closes the channel and discards every message published after it. CarrotMQ then republishes the unconfirmed messages one at a time on a separate channel, so only the refused message is retried until `RetryLimit`. The others are confirmed as usual. After a request is confirmed there, the next message waits for its reply, at most until the request times out or `RecoveryChannelIdleTimeoutInMs` passes.
 
 ---
 

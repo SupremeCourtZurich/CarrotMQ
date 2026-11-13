@@ -18,6 +18,7 @@ namespace CarrotMQ.RabbitMQ.Test;
 [TestClass]
 public class PublisherConfirmChannelTests
 {
+    private static readonly ShutdownEventArgs Refusal = new(ShutdownInitiator.Peer, 404, "NOT_FOUND", 60, 40);
     private readonly DateTime _dateTimeNow = new(2023, 05, 12, 11, 29, 59);
     private readonly PublisherConfirmOptions _publisherConfirmOptions = new();
     private IConnection _connection = null!;
@@ -32,11 +33,13 @@ public class PublisherConfirmChannelTests
     private int _channelDeliveryTagCounter;
 #endif
     private PublisherConfirmChannel _publisherConfirmChannel = null!;
+    private bool _disposed;
 
     [TestInitialize]
     public async Task Initialize()
     {
         _publisherConfirmOptions.RetryLimit = 5;
+        _publisherConfirmOptions.RecoveryChannelIdleTimeoutInMs = 200;
         _basicProperties = Substitute.For<IBasicProperties>();
         _basicProperties.DeliveryMode.Returns(DeliveryModes.Transient);
 
@@ -61,19 +64,17 @@ public class PublisherConfirmChannelTests
         _dateTimeProvider = Substitute.For<IDateTimeProvider>();
         _dateTimeProvider.Now.Returns(_dateTimeNow);
 
-        _publisherConfirmChannel = await PublisherConfirmChannel.CreateAsync(
-                _connection,
-                TimeSpan.FromSeconds(2),
-                _publisherConfirmOptions,
-                new ProtocolSerializer(),
-                TestLoggerFactory.Instance,
-                _intervalTimer,
-                _dateTimeProvider) as PublisherConfirmChannel
-            ?? throw new InvalidOperationException();
+        _publisherConfirmChannel = await CreatePublisherConfirmChannelAsync().ConfigureAwait(false);
 
         await VerifyInitialCallsAsync().ConfigureAwait(false);
 
         await FireRepublishTimerEventAsync().ConfigureAwait(false); // Trigger timer for first OnTimedEvent (avoid "republishAll" call)
+    }
+
+    [TestCleanup]
+    public async Task Cleanup()
+    {
+        if (!_disposed) await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -281,6 +282,292 @@ public class PublisherConfirmChannelTests
         await VerifyBasicPublishAsync(noOfMessages + 1).ConfigureAwait(false);
     }
 
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task PublishRefused_OutstandingMessagesArePublishedOnTheRecoveryChannelOneAtATime()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        var tasks = PublishAsync(2, CancellationToken.None);
+
+        // Act
+        RefuseMainChannel();
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false));
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(2).ConfigureAwait(false));
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+
+        // Assert
+        recoveryChannel.AssertLog("publish 1", "ack 1", "publish 2", "ack 2");
+        await VerifyBasicPublishAsync(2).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task PublishRefusedOnTheRecoveryChannel_OnlyTheRefusedMessageIsRetried()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        var tasks = PublishAsync(2, CancellationToken.None);
+
+        // Act
+        RefuseMainChannel();
+        recoveryChannel.Refuse(await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false));
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(2).ConfigureAwait(false));
+        await tasks[1].ConfigureAwait(false);
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(3).ConfigureAwait(false));
+        await tasks[0].ConfigureAwait(false);
+
+        // Assert
+        recoveryChannel.AssertLog("publish 1", "refuse 1", "publish 2", "ack 2", "publish 3", "ack 3");
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task PublishRefusedAfterRepublishes_RetryLimitCountsTheEarlierAttempts()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        recoveryChannel.RefuseEveryPublish();
+        var task = PublishAsync(1, CancellationToken.None).Single();
+        await RepublishAsync(2).ConfigureAwait(false);
+
+        // Act
+        RefuseMainChannel();
+        await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+
+        // Assert
+        recoveryChannel.AssertPublishes(_publisherConfirmOptions.RetryLimit - 2);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RecoveryChannelIdle_IsClosedAfterRecoveryChannelIdleTimeout()
+    {
+        // Arrange
+        await RecreateChannelAsync(options => options.RetryIntervalInMs = 60_000).ConfigureAwait(false);
+        var recoveryChannel = UseRecoveryChannel();
+        var tasks = PublishAsync(1, CancellationToken.None);
+
+        // Act
+        RefuseMainChannel();
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false));
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+
+        // Assert
+        await recoveryChannel.WaitForDisposeAsync(1).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task DisposedWhileRecovering_RecoveryChannelIsDisposed()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        PublishAsync(1, CancellationToken.None);
+        RefuseMainChannel();
+        await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false);
+
+        // Act
+        _disposed = true;
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        await recoveryChannel.Channel.Received(1).DisposeAsync().ConfigureAwait(false);
+        await VerifyRecoveryChannelOpensAsync(1).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RecoveryChannelClosedWhenIdle_IsReopenedOnTheNextRefusal()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        var first = PublishAsync(1, CancellationToken.None);
+        RefuseMainChannel();
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false));
+        await Task.WhenAll(first).ConfigureAwait(false);
+        await recoveryChannel.WaitForDisposeAsync(1).ConfigureAwait(false);
+
+        // Act
+        var second = PublishAsync(1, CancellationToken.None);
+        RefuseMainChannel();
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(2).ConfigureAwait(false));
+        await Task.WhenAll(second).ConfigureAwait(false);
+
+        // Assert
+        await VerifyRecoveryChannelOpensAsync(2).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosedWithoutRefusal_NoRecoveryChannelIsCreated()
+    {
+        // Arrange
+        PublishAsync(2, CancellationToken.None);
+
+        // Act
+        CloseChannel(new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), 2).ConfigureAwait(false);
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+
+        // Assert
+        await VerifyBasicPublishAsync(4).ConfigureAwait(false);
+        await VerifyRecoveryChannelOpensAsync(0).ConfigureAwait(false);
+    }
+
+    private static async Task WaitForCallsAsync<T>(T substitute, string methodName, int count)
+        where T : class
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(4);
+        while (substitute.ReceivedCalls().Count(c => string.Equals(c.GetMethodInfo().Name, methodName, StringComparison.Ordinal)) < count)
+        {
+            if (DateTime.UtcNow > deadline) throw new TimeoutException($"{methodName} not called {count} times within 4 s");
+
+            await Task.Delay(10).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<PublisherConfirmChannel> CreatePublisherConfirmChannelAsync()
+    {
+        return await PublisherConfirmChannel.CreateAsync(
+                _connection,
+                TimeSpan.FromSeconds(2),
+                _publisherConfirmOptions,
+                new ProtocolSerializer(),
+                TestLoggerFactory.Instance,
+                _intervalTimer,
+                _dateTimeProvider)
+            .ConfigureAwait(false) as PublisherConfirmChannel
+            ?? throw new InvalidOperationException();
+    }
+
+    private void RefuseMainChannel()
+    {
+        CloseChannel(Refusal);
+    }
+
+    private RecoveryChannel UseRecoveryChannel()
+    {
+        var recoveryChannel = new RecoveryChannel();
+
+        // The recovery channel is opened with its cancellable dispose token, the main channel without a token.
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                if (ci.ArgAt<CancellationToken>(1).CanBeCanceled) return recoveryChannel.Channel;
+
+                _channelDeliveryTagCounter = 0;
+
+                return _channel;
+            });
+
+        return recoveryChannel;
+    }
+
+    private async Task VerifyRecoveryChannelOpensAsync(int times)
+    {
+        await _connection.Received(times)
+            .CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Is<CancellationToken>(t => t.CanBeCanceled))
+            .ConfigureAwait(false);
+    }
+
+    private async Task RecreateChannelAsync(Action<PublisherConfirmOptions> configure)
+    {
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+        configure(_publisherConfirmOptions);
+        _publisherConfirmChannel = await CreatePublisherConfirmChannelAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The channel every recovery and quarantine publish goes to; acks and refusals are recorded in order.
+    /// </summary>
+    private sealed class RecoveryChannel
+    {
+        private readonly object _lock = new();
+        private readonly List<string> _log = [];
+        private bool _refuseEveryPublish;
+        private long _seqNo;
+
+        public RecoveryChannel()
+        {
+            Channel = Substitute.For<IChannel>();
+            Channel.IsOpen.Returns(true);
+            Channel.GetNextPublishSequenceNumberAsync(Arg.Any<CancellationToken>()).Returns(_ => (ulong)Interlocked.Increment(ref _seqNo));
+            Channel.When(async c => await c.BasicPublishAsync(
+                        Arg.Any<string>(),
+                        Arg.Any<string>(),
+                        Arg.Any<bool>(),
+                        Arg.Any<BasicProperties>(),
+                        Arg.Any<ReadOnlyMemory<byte>>(),
+                        Arg.Any<CancellationToken>())
+                    .ConfigureAwait(false))
+                .Do(_ =>
+                {
+                    var seqNo = (ulong)Interlocked.Read(ref _seqNo);
+                    Record($"publish {seqNo}");
+                    if (_refuseEveryPublish) Refuse(seqNo);
+                });
+        }
+
+        public IChannel Channel { get; }
+
+        public void RefuseEveryPublish()
+        {
+            _refuseEveryPublish = true;
+        }
+
+        public void Ack(ulong seqNo)
+        {
+            Record($"ack {seqNo}");
+            Channel.BasicAcksAsync += Raise.Event<AckAsyncEventHandler>(Channel, new BasicAckEventArgs(seqNo, false));
+        }
+
+        public void Refuse(ulong seqNo)
+        {
+            Record($"refuse {seqNo}");
+            Channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(Channel, Refusal);
+        }
+
+        public async Task<ulong> WaitForPublishAsync(int count)
+        {
+            await WaitForCallsAsync(Channel, nameof(IChannel.BasicPublishAsync), count).ConfigureAwait(false);
+
+            return (ulong)count;
+        }
+
+        public Task WaitForDisposeAsync(int count)
+        {
+            return WaitForCallsAsync(Channel, nameof(IChannel.DisposeAsync), count);
+        }
+
+        public void AssertPublishes(int count)
+        {
+            Assert.AreEqual(count, Snapshot().Count(e => e.StartsWith("publish ", StringComparison.Ordinal)));
+        }
+
+        public void AssertLog(params string[] expected)
+        {
+            CollectionAssert.AreEqual(expected, Snapshot(), string.Join(", ", Snapshot()));
+        }
+
+        private void Record(string entry)
+        {
+            lock (_lock)
+            {
+                _log.Add(entry);
+            }
+        }
+
+        private List<string> Snapshot()
+        {
+            lock (_lock)
+            {
+                return [.. _log];
+            }
+        }
+    }
+
     private Task[] PublishAsync(int noOfMessages, CancellationToken token)
     {
         if (noOfMessages <= 0) return [];
@@ -330,6 +617,16 @@ public class PublisherConfirmChannelTests
     private async Task FireRepublishTimerEventAsync()
     {
         await _intervalTimer.FireTimedEvent(new IIntervalTimer.IntervalTimerElapsedEventArgs()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the channel and lets exactly one recovery reopen it (recovery checks <c>IsOpen</c> twice).
+    /// </summary>
+    private void CloseChannel(ShutdownEventArgs shutdownEventArgs)
+    {
+        var closedChecks = 2;
+        _channel.IsOpen.Returns(_ => Interlocked.Decrement(ref closedChecks) < 0);
+        _channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, shutdownEventArgs);
     }
 
     private void FireChannelShutdown()
