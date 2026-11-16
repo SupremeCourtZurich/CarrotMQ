@@ -22,15 +22,27 @@ internal sealed class ChannelSpy
     private static readonly ProxyGenerator Generator = new();
     private readonly ConcurrentBag<ChannelInterceptor> _mainChannels = [];
     private int _mainChannelPublishes;
+    private TaskCompletionSource<bool> _mainChannelClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource<bool>? _recoveryHold;
 
     /// <summary>
-    /// Holds the recovery of closed main channels until the returned scope is disposed; publishes meanwhile stay unconfirmed
-    /// on the closed channel and are handed over together with the ones that were outstanding at the close.
+    /// Completes once a main channel was closed after the last <see cref="HoldMainChannelRecovery" />.
+    /// </summary>
+    public Task WaitForMainChannelCloseAsync()
+    {
+        var closed = Volatile.Read(ref _mainChannelClosed).Task;
+
+        return Wait.UntilAsync(() => closed.IsCompleted, "main channel closed");
+    }
+
+    /// <summary>
+    /// Holds the recovery of closed main channels until the returned scope is disposed; publishes meanwhile go to the closed
+    /// channel and are handed over together with the ones that were outstanding at the close.
     /// </summary>
     public IDisposable HoldMainChannelRecovery()
     {
         var hold = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Volatile.Write(ref _mainChannelClosed, new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
         Volatile.Write(ref _recoveryHold, hold);
 
         return new Release(() =>
@@ -221,6 +233,7 @@ internal sealed class ChannelSpy
                     var shutdown = (AsyncEventHandler<ShutdownEventArgs>)invocation.Arguments[0];
                     invocation.SetArgumentValue(0, new AsyncEventHandler<ShutdownEventArgs>(async (s, e) =>
                     {
+                        Volatile.Read(ref _spy._mainChannelClosed).TrySetResult(true);
                         if (Volatile.Read(ref _spy._recoveryHold) is { } hold) await hold.Task.ConfigureAwait(false);
                         await shutdown(s, e).ConfigureAwait(false);
                     }));

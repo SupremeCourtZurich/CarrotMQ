@@ -75,6 +75,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad = await PublishEventAsync(MissingExchange).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             behind = await PublishEventsAsync(ExistingExchange, 3).ConfigureAwait(false);
         }
 
@@ -99,6 +100,7 @@ public class PublishRefusalTest
             using (_spy.HoldMainChannelRecovery())
             {
                 bad = await PublishEventAsync(internalExchange).ConfigureAwait(false);
+                await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
                 behind = await PublishEventsAsync(ExistingExchange, 3).ConfigureAwait(false);
             }
 
@@ -122,6 +124,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad1 = await PublishEventAsync(MissingExchange).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             good1 = await PublishEventsAsync(ExistingExchange, 2).ConfigureAwait(false);
             bad2 = await PublishEventAsync(MissingExchange).ConfigureAwait(false);
             good2 = await PublishEventsAsync(ExistingExchange, 2).ConfigureAwait(false);
@@ -158,6 +161,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             behind = await QueryAsync(new RefusalTestQuery { Id = 2 }).ConfigureAwait(false);
         }
 
@@ -176,6 +180,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad1 = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             between = await QueryAsync(new RefusalTestQuery { Id = 2, WaitForGate = true }).ConfigureAwait(false);
             bad2 = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
         }
@@ -203,6 +208,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             unanswered = await QueryAsync(new UnansweredQuery(), ttl: 2_000).ConfigureAwait(false);
             behind = await QueryAsync(new RefusalTestQuery { Id = 3 }).ConfigureAwait(false);
         }
@@ -223,6 +229,7 @@ public class PublishRefusalTest
         using (_spy.HoldMainChannelRecovery())
         {
             bad = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
+            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
             late = await QueryAsync(new LateExchangeQuery { Id = 4 }).ConfigureAwait(false);
         }
 

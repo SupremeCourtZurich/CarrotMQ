@@ -22,6 +22,7 @@ internal class PublisherConfirmChannel : PublisherChannel
     private readonly uint _maxRetries;
     private readonly ConcurrentDictionary<ulong, PublisherConfirmMessage> _outstandingConfirms = new();
     private readonly SemaphoreSlim _outstandingConfirmsCount;
+    private readonly ConcurrentQueue<PublisherConfirmMessage> _publishedOnClosedChannel = new();
     private readonly ConcurrentQueue<PublisherConfirmMessage> _republishQueue = new();
     private readonly uint _recoveryChannelIdleTimeoutInMs;
     private readonly uint _retryIntervalInMs;
@@ -166,6 +167,14 @@ internal class PublisherConfirmChannel : PublisherChannel
         catch (AlreadyClosedException exception)
         {
             Logger.LogWarning(exception, "Channel was already closed when publishing. Publish is enqueued for retry.");
+
+            // A failed publish does not advance the sequence number, so the next one reuses it: keep the message by order.
+            if (_outstandingConfirms.TryGetValue(confirmMessage.SeqNo, out var tracked) && ReferenceEquals(tracked, confirmMessage))
+            {
+                _outstandingConfirms.TryRemove(confirmMessage.SeqNo, out _);
+            }
+
+            _publishedOnClosedChannel.Enqueue(confirmMessage);
         }
     }
 
@@ -309,15 +318,20 @@ internal class PublisherConfirmChannel : PublisherChannel
         _lastPublishedSeqNo = 0;
         for (; oldTailSeqNo <= oldHeadSeqNo; oldTailSeqNo++)
         {
-            if (!_outstandingConfirms.TryRemove(oldTailSeqNo, out var oldestOutstandingConfirm)) continue;
+            if (_outstandingConfirms.TryRemove(oldTailSeqNo, out var oldestOutstandingConfirm)) Republish(oldestOutstandingConfirm);
+        }
 
+        while (_publishedOnClosedChannel.TryDequeue(out var unsent)) Republish(unsent);
+
+        void Republish(PublisherConfirmMessage message)
+        {
             if (toRecoveryChannel && !_recoveryChannelDisposed)
             {
-                GetRecoveryChannel().Enqueue(oldestOutstandingConfirm);
+                GetRecoveryChannel().Enqueue(message);
             }
             else
             {
-                _republishQueue.Enqueue(oldestOutstandingConfirm);
+                _republishQueue.Enqueue(message);
             }
         }
     }
@@ -346,6 +360,12 @@ internal class PublisherConfirmChannel : PublisherChannel
     private async Task RepublishOnTimedEventAsync()
     {
         using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+
+        // A channel that recovered by itself is not reopened here, so its unsent messages are not handed over.
+        if (Channel is { IsOpen: true })
+        {
+            while (_publishedOnClosedChannel.TryDequeue(out var unsent)) _republishQueue.Enqueue(unsent);
+        }
 
         while (_republishQueue.TryDequeue(out var publisherConfirmMessage))
         {

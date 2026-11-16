@@ -7,6 +7,7 @@ using CarrotMQ.RabbitMQ.Test.Helper;
 using NSubstitute;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using AckAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.BasicAckEventArgs>;
 using NAckAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.BasicNackEventArgs>;
 using ShutdownAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.ShutdownEventArgs>;
@@ -34,6 +35,7 @@ public class PublisherConfirmChannelTests
 #endif
     private PublisherConfirmChannel _publisherConfirmChannel = null!;
     private bool _disposed;
+    private volatile ShutdownEventArgs? _mainChannelClosedBy;
 
     [TestInitialize]
     public async Task Initialize()
@@ -401,6 +403,54 @@ public class PublisherConfirmChannelTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task PublishedOnTheRefusedChannelBeforeItReopens_AllAreHandedToTheRecoveryChannelInOrder()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        var first = PublishAsync(1, CancellationToken.None).Single();
+        MainChannelRejectsPublishes(Refusal);
+        var second = PublishOneAsync();
+        var third = PublishOneAsync();
+        await WaitForCallsAsync(_channel, nameof(IChannel.BasicPublishAsync), 3).ConfigureAwait(false);
+
+        // Act
+        RefuseMainChannel();
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false));
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(2).ConfigureAwait(false));
+        recoveryChannel.Ack(await recoveryChannel.WaitForPublishAsync(3).ConfigureAwait(false));
+        await Task.WhenAll(first, second, third).ConfigureAwait(false);
+
+        // Assert
+        recoveryChannel.AssertLog("publish 1", "ack 1", "publish 2", "ack 2", "publish 3", "ack 3");
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task PublishedOnAClosedChannelThatRecoversByItself_AllAreRepublishedOnceItIsOpen()
+    {
+        // Arrange
+        var connectionForced = new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED");
+        _channel.IsOpen.Returns(false);
+        MainChannelRejectsPublishes(connectionForced);
+        _channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, connectionForced);
+        var first = PublishOneAsync();
+        var second = PublishOneAsync();
+        await WaitForCallsAsync(_channel, nameof(IChannel.BasicPublishAsync), 2).ConfigureAwait(false);
+
+        // Act
+        MainChannelAcceptsPublishes();
+        _channel.IsOpen.Returns(true);
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+        AckMessage(1);
+        AckMessage(2);
+        await Task.WhenAll(first, second).ConfigureAwait(false);
+
+        // Assert
+        await VerifyBasicPublishAsync(4).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task ChannelClosedWithoutRefusal_NoRecoveryChannelIsCreated()
     {
         // Arrange
@@ -440,6 +490,37 @@ public class PublisherConfirmChannelTests
                 _dateTimeProvider)
             .ConfigureAwait(false) as PublisherConfirmChannel
             ?? throw new InvalidOperationException();
+    }
+
+    private Task PublishOneAsync()
+    {
+        return _publisherConfirmChannel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+    }
+
+    // Like a channel the broker already closed: each publish throws and the sequence number does not advance.
+    private void MainChannelRejectsPublishes(ShutdownEventArgs reason)
+    {
+        var seqNo = (ulong)_channelDeliveryTagCounter + 1;
+        _mainChannelClosedBy = reason;
+        _channel.GetNextPublishSequenceNumberAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => _mainChannelClosedBy != null ? seqNo : (ulong)Interlocked.Increment(ref _channelDeliveryTagCounter));
+        _channel.When(async c => await c.BasicPublishAsync(
+                    Arg.Any<string>(),
+                    Arg.Any<string>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<BasicProperties>(),
+                    Arg.Any<ReadOnlyMemory<byte>>(),
+                    Arg.Any<CancellationToken>())
+                .ConfigureAwait(false))
+            .Do(_ =>
+            {
+                if (_mainChannelClosedBy is { } closedBy) throw new AlreadyClosedException(closedBy);
+            });
+    }
+
+    private void MainChannelAcceptsPublishes()
+    {
+        _mainChannelClosedBy = null;
     }
 
     private void RefuseMainChannel()
