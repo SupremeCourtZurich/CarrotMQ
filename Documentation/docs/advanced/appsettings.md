@@ -39,7 +39,9 @@ builder.ConfigureTracing(sectionName: "CustomTracingSection");
       "MaxConcurrentConfirms": 500,
       "RetryLimit": 100,
       "RetryIntervalInMs": 1000,
-      "RepublishEvaluationIntervalInMs": 100
+      "RepublishEvaluationIntervalInMs": 100,
+      "IsolateRefusedPublishes": false,
+      "RecoveryChannelIdleTimeoutInMs": 60000
     }
   }
 }
@@ -74,6 +76,8 @@ Nested under `BrokerConnection.PublisherConfirm`. See [Publisher Confirms](../co
 | `RetryLimit` | `ushort` | ❌ | `100` | Maximum number of retry attempts before throwing `RetryLimitExceededException`. |
 | `RetryIntervalInMs` | `uint` | ❌ | `1000` | Milliseconds between retry attempts. |
 | `RepublishEvaluationIntervalInMs` | `uint` | ❌ | `100` | How often (ms) CarrotMQ checks internally for messages that need to be republished. |
+| `IsolateRefusedPublishes` | `bool` | ❌ | `false` | If true, a refused publish fails at once with its reason, and the other unconfirmed messages are republished on a separate channel. See [Refused Publishes](../configuration/publisher_confirms.md#refused-publishes). |
+| `RecoveryChannelIdleTimeoutInMs` | `uint` | ❌ | `60000` | With `IsolateRefusedPublishes`: milliseconds without work after which the channel used for refused publishes is closed; also the longest wait there for a request's reply before the next message is published. |
 
 ---
 

@@ -52,6 +52,8 @@ builder.ConfigureBrokerConnection(options =>
 
 When the timeout expires, `BrokerUnreachableException` is thrown. The .NET host treats this as a fatal startup error and terminates.
 
+A publish that waits for the first connection is bounded by the message's TTL and the caller's `CancellationToken`, not only by this timeout. When it gives up, it fails with `PublishFailedException` (`Reason = Unreachable`) — see [While the Broker Is Unreachable](publisher_confirms.md#while-the-broker-is-unreachable).
+
 > **Tip:** Prefer `InfiniteTimeSpan` in orchestrated environments and a finite timeout in development so that misconfigured endpoints surface quickly.
 
 ---

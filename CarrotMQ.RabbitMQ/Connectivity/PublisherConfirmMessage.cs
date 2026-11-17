@@ -54,4 +54,14 @@ internal sealed class PublisherConfirmMessage
     public TaskCompletionSource<bool> CompletionSource { get; }
 
     public ulong SeqNo { get; set; }
+
+    /// <summary>
+    /// Why the last attempt failed; reported when the retry limit is exceeded.
+    /// </summary>
+    public PublishFailureReason LastFailureReason { get; set; }
+
+    /// <summary>
+    /// The transport's exception of the last failed attempt, if any.
+    /// </summary>
+    public Exception? LastFailure { get; set; }
 }

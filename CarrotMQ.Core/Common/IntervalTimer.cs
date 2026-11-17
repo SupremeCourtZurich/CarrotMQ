@@ -28,9 +28,9 @@ public sealed class IntervalTimer : IIntervalTimer
 
     private async void TimerOnElapsed(object? sender, ElapsedEventArgs e)
     {
-        _timer.Stop();
         try
         {
+            _timer.Stop();
             if (ElapsedAsync != null)
             {
                 await ElapsedAsync.InvokeAllAsync(this, new IIntervalTimer.IntervalTimerElapsedEventArgs(e)).ConfigureAwait(false);
@@ -41,7 +41,14 @@ public sealed class IntervalTimer : IIntervalTimer
             // Ignore
         }
 
-        _timer.Start();
+        try
+        {
+            _timer.Start();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposed while the event was processed.
+        }
     }
 
     /// <inheritdoc />

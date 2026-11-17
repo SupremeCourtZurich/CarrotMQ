@@ -7,6 +7,7 @@ using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using RabbitMQ.Client.Exceptions;
 
 namespace CarrotMQ.RabbitMQ.Connectivity;
 
@@ -42,9 +43,13 @@ public sealed class RabbitTransport : ITransport
     /// <inheritdoc />
     public async Task SendAsync(CarrotMessage message, CancellationToken cancellationToken)
     {
-        var publisherChannel = message.Header.MessageProperties.PublisherConfirm
-            ? await _brokerConnection.GetPublisherChannelWithConfirmsAsync().ConfigureAwait(false)
-            : await _brokerConnection.GetPublisherChannelAsync().ConfigureAwait(false);
+        var publisherChannel = await GetChannelAsync<IPublisherChannel>(
+                message.Header.MessageProperties.PublisherConfirm
+                    ? _brokerConnection.GetPublisherChannelWithConfirmsAsync
+                    : _brokerConnection.GetPublisherChannelAsync,
+                message.Header,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         SetHeaderInfos(message.Header);
 
@@ -64,9 +69,13 @@ public sealed class RabbitTransport : ITransport
         CarrotMessage message,
         CancellationToken cancellationToken)
     {
-        var directReplyChannel = message.Header.MessageProperties.PublisherConfirm
-            ? await _brokerConnection.GetDirectReplyConfirmChannelAsync().ConfigureAwait(false)
-            : await _brokerConnection.GetDirectReplyChannelAsync().ConfigureAwait(false);
+        var directReplyChannel = await GetChannelAsync<IDirectReplyChannel>(
+                message.Header.MessageProperties.PublisherConfirm
+                    ? _brokerConnection.GetDirectReplyConfirmChannelAsync
+                    : _brokerConnection.GetDirectReplyChannelAsync,
+                message.Header,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         SetHeaderInfos(message.Header);
 
@@ -81,6 +90,51 @@ public sealed class RabbitTransport : ITransport
             .ConfigureAwait(false);
 
         return response;
+    }
+
+    // A connect timeout surfaces as BrokerUnreachableException or as OperationCanceledException.
+    private async Task<TChannel> GetChannelAsync<TChannel>(
+        Func<Task<TChannel>> getChannel,
+        CarrotHeader header,
+        CancellationToken token)
+    {
+        try
+        {
+            return await WaitAsync(getChannel(), token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            var reason = PublishFailure.ReasonAtCancellation(_brokerConnection.CurrentConnection, PublishFailureReason.Unknown);
+
+            throw PublishFailure.Cancelled(header, reason, ex);
+        }
+        catch (Exception ex) when (ex is BrokerUnreachableException or OperationCanceledException)
+        {
+            throw PublishFailure.Unreachable(header, ex);
+        }
+    }
+
+    // The channel is shared, so its creation goes on when the caller stops waiting.
+    private static async Task<T> WaitAsync<T>(Task<T> task, CancellationToken token)
+    {
+        if (task.IsCompleted || !token.CanBeCanceled) return await task.ConfigureAwait(false);
+
+        var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using (token.Register(() => cancelled.TrySetResult(true)))
+        {
+            if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task)
+            {
+                _ = task.ContinueWith(
+                    static t => t.Exception,
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+
+                throw new OperationCanceledException(token);
+            }
+        }
+
+        return await task.ConfigureAwait(false);
     }
 
     private void SetHeaderInfos(CarrotHeader header)

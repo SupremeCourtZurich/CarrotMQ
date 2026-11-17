@@ -3,10 +3,10 @@
 namespace CarrotMQ.Core.Protocol;
 
 /// <summary>
-/// Represents an exception thrown when the retry limit for a message sent with publisher confirm is exceeded.
-/// No ack has been received from the broker to confirm the arrival of this message.
+/// Represents an exception thrown when a message sent with publisher confirm was not confirmed by the broker: the retry
+/// limit was exceeded, or the broker refused the message. <see cref="PublishFailedException.Reason" /> tells which.
 /// </summary>
-public sealed class RetryLimitExceededException : Exception
+public sealed class RetryLimitExceededException : PublishFailedException
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="RetryLimitExceededException" /> class with no specific message.
@@ -32,6 +32,17 @@ public sealed class RetryLimitExceededException : Exception
     /// <param name="inner">The inner exception that caused this exception.</param>
     public RetryLimitExceededException(string message, Exception inner)
         : base(message, inner)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RetryLimitExceededException" /> class with a reason.
+    /// </summary>
+    /// <param name="message">The message that describes the error.</param>
+    /// <param name="reason">Why the publish was not confirmed.</param>
+    /// <param name="inner">The transport's exception that caused this exception, if any.</param>
+    public RetryLimitExceededException(string message, PublishFailureReason reason, Exception? inner = null)
+        : base(message, reason, inner)
     {
     }
 }
