@@ -11,14 +11,13 @@ using RabbitMQ.Client.Exceptions;
 namespace CarrotMQ.RabbitMQ.Connectivity;
 
 /// <summary>
-/// Republishes the messages of a channel the broker closed over a refused publish, one at a time on channels of its
-/// own: a recovery channel for the messages, and a quarantine channel for those it identifies as refused.
-/// Each channel is opened on demand and closed once idle.
+/// Republishes the messages of a channel the broker closed over a refused publish, one at a time on a channel of its
+/// own, and fails each message the broker refuses there with the broker's reason.
+/// The channel is opened on demand and closed once idle.
 /// </summary>
 internal sealed class PublishRecoveryChannel : IAsyncDisposable
 {
     private readonly CancellationTokenSource _disposeCts = new();
-    private readonly SerialPublisher _quarantine;
     private readonly SerialPublisher _recovery;
 
     public PublishRecoveryChannel(
@@ -44,8 +43,7 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
             logger,
             _disposeCts.Token);
 
-        _quarantine = new SerialPublisher("quarantine", settings, null);
-        _recovery = new SerialPublisher("recovery", settings, _quarantine);
+        _recovery = new SerialPublisher("recovery", settings);
     }
 
     /// <summary>
@@ -65,7 +63,6 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
     {
         _disposeCts.Cancel();
         await _recovery.DisposeAsync().ConfigureAwait(false);
-        await _quarantine.DisposeAsync().ConfigureAwait(false);
     }
 
     private sealed class Settings
@@ -126,7 +123,6 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
     {
         private readonly string _name;
         private readonly ConcurrentQueue<PublisherConfirmMessage> _queue = new();
-        private readonly SerialPublisher? _refusedTarget;
         private readonly Settings _settings;
         private readonly SemaphoreSlim _signal = new(0);
         private Attempt? _attempt;
@@ -135,12 +131,10 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
         private int _pendingRequeues;
         private int _running;
 
-        // Refused messages go to refusedTarget; without one they are retried here.
-        public SerialPublisher(string name, Settings settings, SerialPublisher? refusedTarget)
+        public SerialPublisher(string name, Settings settings)
         {
             _name = name;
             _settings = settings;
-            _refusedTarget = refusedTarget;
         }
 
         public void Enqueue(PublisherConfirmMessage message)
@@ -248,7 +242,7 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
             message.RepublishCount++;
             if (message.RepublishCount > _settings.MaxRetries)
             {
-                message.CompletionSource.TrySetException(new RetryLimitExceededException());
+                message.CompletionSource.TrySetException(PublishFailure.RetryLimitExceeded(message, _settings.MaxRetries));
 
                 return;
             }
@@ -267,8 +261,7 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
 
             if (outcome.CloseReason != null || outcome.Error != null || outcome.TimedOut) await RetireAsync(channel).ConfigureAwait(false);
 
-            var refused = IsPublishRefusal(outcome.CloseReason);
-            if (refused && _refusedTarget != null)
+            if (IsPublishRefusal(outcome.CloseReason))
             {
                 _settings.Logger.LogInformation(
                     "Publish refused: exchange={Exchange}, routingKey={RoutingKey}, messageId={MessageId}, reason={ReplyCode}:{ReplyText}",
@@ -277,9 +270,18 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
                     header.MessageId,
                     outcome.CloseReason!.ReplyCode,
                     outcome.CloseReason.ReplyText);
-                _refusedTarget.EnqueueAfter(message, _settings.RetryInterval);
+                message.CompletionSource.TrySetException(PublishFailure.Refused(message, outcome.CloseReason));
 
                 return;
+            }
+
+            if (outcome.CloseReason != null)
+            {
+                PublishFailure.RecordClose(message, outcome.CloseReason);
+            }
+            else if (outcome.Error == null)
+            {
+                PublishFailure.RecordNoConfirm(message);
             }
 
             if (outcome.Error != null) _settings.Logger.LogWarning(outcome.Error, "Publish on the {Name} channel failed", _name);

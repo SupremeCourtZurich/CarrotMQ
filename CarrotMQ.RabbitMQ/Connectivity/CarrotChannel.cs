@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
 using CarrotMQ.Core.Configuration;
@@ -28,6 +29,65 @@ internal class CarrotChannel : ICarrotChannel
         Connection = connection;
         ProtocolSerializer = protocolSerializer;
         Logger = loggerFactory.CreateLogger<CarrotChannel>();
+        Connection.RecoverySucceededAsync += ConnectionRecoverySucceededAsync;
+    }
+
+    private TaskCompletionSource<bool> _reopened = CompletedSignal();
+
+    /// <summary>
+    /// Completes when the channel may be open again: CarrotMQ reopened it, or the client recovered the connection.
+    /// Call under <see cref="ChannelLock" />, then check <see cref="IsOpen" /> again before waiting.
+    /// </summary>
+    protected Task NextReopenAsync()
+    {
+        if (Volatile.Read(ref _reopened).Task.IsCompleted)
+        {
+            Volatile.Write(ref _reopened, new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously));
+        }
+
+        return Volatile.Read(ref _reopened).Task;
+    }
+
+    /// <summary>
+    /// Waits for <paramref name="task" /> until <paramref name="token" /> is cancelled.
+    /// </summary>
+    /// <exception cref="OperationCanceledException">Thrown when <paramref name="token" /> is cancelled first.</exception>
+    protected static async Task WaitAsync(Task task, CancellationToken token)
+    {
+        if (token.CanBeCanceled)
+        {
+            var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using (token.Register(() => cancelled.TrySetResult(true)))
+            {
+                await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false);
+            }
+
+            token.ThrowIfCancellationRequested();
+        }
+        else
+        {
+            await task.ConfigureAwait(false);
+        }
+    }
+
+    private static TaskCompletionSource<bool> CompletedSignal()
+    {
+        var signal = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        signal.SetResult(true);
+
+        return signal;
+    }
+
+    private void SignalReopened()
+    {
+        Volatile.Read(ref _reopened).TrySetResult(true);
+    }
+
+    private Task ConnectionRecoverySucceededAsync(object sender, AsyncEventArgs e)
+    {
+        SignalReopened();
+
+        return Task.CompletedTask;
     }
 
     protected IProtocolSerializer ProtocolSerializer { get; }
@@ -77,6 +137,7 @@ internal class CarrotChannel : ICarrotChannel
 
         if (IsDisposed) throw new ObjectDisposedException(nameof(CarrotChannel));
         IsDisposed = true;
+        Connection.RecoverySucceededAsync -= ConnectionRecoverySucceededAsync;
 
         await DisposeChannelAsync().ConfigureAwait(false);
         GC.SuppressFinalize(this);
@@ -232,6 +293,7 @@ internal class CarrotChannel : ICarrotChannel
         Channel.ChannelShutdownAsync += ChannelShutdownAsync;
         Channel.FlowControlAsync += ChannelOnFlowControlAsync;
         Channel.CallbackExceptionAsync += ChannelOnCallbackExceptionAsync;
+        SignalReopened();
 
         Logger.LogDebug("Channel {ChannelNumber} has been created", Channel?.ChannelNumber);
     }

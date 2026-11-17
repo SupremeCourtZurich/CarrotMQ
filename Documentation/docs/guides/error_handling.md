@@ -126,8 +126,9 @@ Middleware can also influence error handling by setting `context.IsErrorResult =
 
 | Exception | When it is thrown |
 |---|---|
-| `OperationCanceledException` | The configured TTL expired before a response was received, or the provided `CancellationToken` was cancelled. |
-| `RetryLimitExceededException` | Publisher confirms could not be obtained within the configured retry limit. The message may or may not have been delivered. |
+| `OperationCanceledException` | The provided `CancellationToken` was cancelled, or a request was published but its response did not arrive within the TTL. |
+| `RetryLimitExceededException` | Publisher confirms could not be obtained within the configured retry limit, or the broker refused the message. The message may or may not have been delivered. Derives from `PublishFailedException`, whose `Reason` tells why (see [Publisher Confirms](../configuration/publisher_confirms.md#why-it-failed)). |
+| `PublishFailedException` | No connection to the broker could be established, the TTL expired before the broker confirmed the message, or, without publisher confirms, the channel was closed when the message was published. `Reason` is `Unreachable` while the connection is down (see [While the Broker Is Unreachable](../configuration/publisher_confirms.md#while-the-broker-is-unreachable)). |
 | `ArgumentException` | The message has invalid properties — for example, a `ICustomRoutingEvent` was published with an exchange name that contains illegal characters. |
 
 Wrap `SendReceiveAsync` (and fire-and-forget send calls in critical paths) in a `try/catch` to handle these cases gracefully:
@@ -140,11 +141,19 @@ try
 }
 catch (OperationCanceledException)
 {
-    // TTL expired or cancellation was requested
+    // No response within the TTL, or cancellation was requested
+}
+catch (PublishFailedException ex) when (ex.Reason == PublishFailureReason.Unreachable)
+{
+    // Broker unreachable, also when the retries ran out on a lost connection — back off and retry later
 }
 catch (RetryLimitExceededException)
 {
-    // Could not confirm delivery — consider compensating action
+    // Could not confirm delivery, or the broker refused the message — consider compensating action
+}
+catch (PublishFailedException)
+{
+    // The TTL expired before the broker confirmed the message — retry later
 }
 catch (ArgumentException ex)
 {

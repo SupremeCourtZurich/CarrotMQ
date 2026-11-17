@@ -16,11 +16,6 @@ internal sealed class LogRecorder : ILoggerProvider
     /// </summary>
     public int Refusals => _messages.Count(m => m.StartsWith(PublishRefused, StringComparison.Ordinal));
 
-    public Task WaitForRefusalsAsync(int count)
-    {
-        return Wait.UntilAsync(() => Refusals >= count, $"{count} refusals logged");
-    }
-
     public ILogger CreateLogger(string categoryName)
     {
         return new Logger(_messages);

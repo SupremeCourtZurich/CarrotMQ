@@ -13,13 +13,13 @@ public class IntervalTimerTest
         // Arrange
         var handlerEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseHandler = new TaskCompletionSource<bool>();
-        var handlerFinished = false;
+        var handlerFinished = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var timer = new IntervalTimer(1);
         timer.ElapsedAsync += async (_, _) =>
         {
             handlerEntered.TrySetResult(true);
             await releaseHandler.Task.ConfigureAwait(false);
-            handlerFinished = true;
+            handlerFinished.TrySetResult(true);
         };
         timer.Start();
         await handlerEntered.Task.ConfigureAwait(false);
@@ -29,7 +29,7 @@ public class IntervalTimerTest
         releaseHandler.SetResult(true);
 
         // Assert
-        Assert.IsTrue(handlerFinished);
+        await handlerFinished.Task.ConfigureAwait(false);
     }
 
     [TestMethod]

@@ -59,15 +59,6 @@ public class RabbitApi : IDisposable
         await _httpClient.SendAsync(request).ConfigureAwait(false);
     }
 
-    public async Task BindExchangeAsync(string source, string destination, string routingKey)
-    {
-        var body = JsonSerializer.Serialize(new { routing_key = routingKey });
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/bindings/{_vHost}/e/{source}/e/{destination}");
-        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-        var responseMessage = await _httpClient.SendAsync(request).ConfigureAwait(false);
-        responseMessage.EnsureSuccessStatusCode();
-    }
-
     public async Task PurgeQueueAsync(string queue)
     {
         using var request = new HttpRequestMessage(HttpMethod.Delete, $"api/queues/{_vHost}/{queue}/contents");

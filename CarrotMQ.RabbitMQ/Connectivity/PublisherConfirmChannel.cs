@@ -19,6 +19,7 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 internal class PublisherConfirmChannel : PublisherChannel
 {
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly bool _isolateRefusedPublishes;
     private readonly uint _maxRetries;
     private readonly ConcurrentDictionary<ulong, PublisherConfirmMessage> _outstandingConfirms = new();
     private readonly SemaphoreSlim _outstandingConfirmsCount;
@@ -59,7 +60,13 @@ internal class PublisherConfirmChannel : PublisherChannel
         _retryIntervalInMs = options.RetryIntervalInMs;
         _maxRetries = options.RetryLimit;
         _recoveryChannelIdleTimeoutInMs = options.RecoveryChannelIdleTimeoutInMs;
+        _isolateRefusedPublishes = options.IsolateRefusedPublishes;
     }
+
+    /// <summary>
+    /// The number of messages waiting for the closed channel to be reopened.
+    /// </summary>
+    internal int PublishedOnClosedChannelCount => _publishedOnClosedChannel.Count;
 
     protected override CreateChannelOptions CreateChannelOptions()
     {
@@ -104,13 +111,21 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <summary>
     /// Publishes a message asynchronously with publisher confirms.
     /// </summary>
-    /// <exception cref="OperationCanceledException">
-    /// Thrown when the <paramref name="token" /> is canceled before the publish operation completes.
+    /// <exception cref="PublishFailedException">
+    /// Thrown when the <paramref name="token" /> is canceled before the broker confirmed the message; the
+    /// <see cref="OperationCanceledException" /> is the inner exception.
     /// </exception>
     /// <exception cref="Exception">Thrown when an error occurs during the publish operation.</exception>
     public override async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
-        await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex);
+        }
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var basicProperties = CreateBasicProperties(message.Header);
@@ -128,12 +143,18 @@ internal class PublisherConfirmChannel : PublisherChannel
 #endif
         try
         {
-            using (await ChannelLock.LockAsync().ConfigureAwait(false))
+            using (await ChannelLock.LockAsync(token).ConfigureAwait(false))
             {
                 await PublishInternallyAsync(confirmMessage).ConfigureAwait(false);
             }
 
             await confirmMessage.CompletionSource.Task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            var reason = PublishFailure.ReasonAtCancellation(Connection, IsOpen, confirmMessage.LastFailureReason);
+
+            throw PublishFailure.Cancelled(message.Header, reason, ex);
         }
         finally
         {
@@ -144,6 +165,15 @@ internal class PublisherConfirmChannel : PublisherChannel
     private async Task PublishInternallyAsync(PublisherConfirmMessage confirmMessage)
     {
         if (confirmMessage.CancellationToken.IsCancellationRequested) return;
+
+        // A channel known to be closed is never handed a publish: the client might send it after its close-ok.
+        if (!IsOpen)
+        {
+            if (LastShutdownReason != null) PublishFailure.RecordClose(confirmMessage, LastShutdownReason);
+            _publishedOnClosedChannel.Enqueue(confirmMessage);
+
+            return;
+        }
 
         confirmMessage.PublishedAt = _dateTimeProvider.Now;
         confirmMessage.SeqNo = await Channel!.GetNextPublishSequenceNumberAsync(confirmMessage.CancellationToken).ConfigureAwait(false);
@@ -167,6 +197,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         catch (AlreadyClosedException exception)
         {
             Logger.LogWarning(exception, "Channel was already closed when publishing. Publish is enqueued for retry.");
+            if (exception.ShutdownReason != null) PublishFailure.RecordClose(confirmMessage, exception.ShutdownReason);
 
             // A failed publish does not advance the sequence number, so the next one reuses it: keep the message by order.
             if (_outstandingConfirms.TryGetValue(confirmMessage.SeqNo, out var tracked) && ReferenceEquals(tracked, confirmMessage))
@@ -185,7 +216,7 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override async Task CreateChannelAsync()
     {
-        var closedByRefusal = PublishRecoveryChannel.IsPublishRefusal(LastShutdownReason);
+        var closedByRefusal = _isolateRefusedPublishes && PublishRecoveryChannel.IsPublishRefusal(LastShutdownReason);
         await base.CreateChannelAsync().ConfigureAwait(false);
 
         Channel!.BasicAcksAsync += BasicAcksAsync;
@@ -242,7 +273,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             {
                 if (_outstandingConfirms.TryRemove(_tailSeqNo, out var message))
                 {
-                    message.CompletionSource.SetResult(true);
+                    message.CompletionSource.TrySetResult(true);
                 }
             }
         }
@@ -250,7 +281,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         {
             if (_outstandingConfirms.TryRemove(e.DeliveryTag, out var message))
             {
-                message.CompletionSource.SetResult(true);
+                message.CompletionSource.TrySetResult(true);
             }
 
             if (e.DeliveryTag != _tailSeqNo) return;
@@ -274,6 +305,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             {
                 if (_outstandingConfirms.TryRemove(_tailSeqNo, out var message))
                 {
+                    PublishFailure.RecordNoConfirm(message);
                     _republishQueue.Enqueue(message);
                 }
             }
@@ -282,6 +314,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         {
             if (_outstandingConfirms.TryRemove(e.DeliveryTag, out var message))
             {
+                PublishFailure.RecordNoConfirm(message);
                 _republishQueue.Enqueue(message);
             }
 
@@ -321,7 +354,10 @@ internal class PublisherConfirmChannel : PublisherChannel
             if (_outstandingConfirms.TryRemove(oldTailSeqNo, out var oldestOutstandingConfirm)) Republish(oldestOutstandingConfirm);
         }
 
-        while (_publishedOnClosedChannel.TryDequeue(out var unsent)) Republish(unsent);
+        while (_publishedOnClosedChannel.TryDequeue(out var unsent))
+        {
+            Republish(unsent);
+        }
 
         void Republish(PublisherConfirmMessage message)
         {
@@ -331,6 +367,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             }
             else
             {
+                if (LastShutdownReason != null) PublishFailure.RecordClose(message, LastShutdownReason);
                 _republishQueue.Enqueue(message);
             }
         }
@@ -364,7 +401,10 @@ internal class PublisherConfirmChannel : PublisherChannel
         // A channel that recovered by itself is not reopened here, so its unsent messages are not handed over.
         if (Channel is { IsOpen: true })
         {
-            while (_publishedOnClosedChannel.TryDequeue(out var unsent)) _republishQueue.Enqueue(unsent);
+            while (_publishedOnClosedChannel.TryDequeue(out var unsent))
+            {
+                _republishQueue.Enqueue(unsent);
+            }
         }
 
         while (_republishQueue.TryDequeue(out var publisherConfirmMessage))
@@ -383,7 +423,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         confirmMessage.RepublishCount++;
         if (confirmMessage.RepublishCount > _maxRetries)
         {
-            confirmMessage.CompletionSource.SetException(new RetryLimitExceededException());
+            confirmMessage.CompletionSource.TrySetException(PublishFailure.RetryLimitExceeded(confirmMessage, _maxRetries));
 
             return;
         }
@@ -399,7 +439,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         catch (Exception e)
         {
             Logger.LogTrace(e, "Caught exception while publishing");
-            confirmMessage.CompletionSource.SetException(e);
+            confirmMessage.CompletionSource.TrySetException(e);
         }
     }
 
@@ -420,6 +460,7 @@ internal class PublisherConfirmChannel : PublisherChannel
             if (oldestOutstandingConfirm != null)
             {
                 _outstandingConfirms.TryRemove(_tailSeqNo, out _);
+                PublishFailure.RecordNoConfirm(oldestOutstandingConfirm);
                 await PublishWithRetryCheckAsync(oldestOutstandingConfirm).ConfigureAwait(false);
             }
 

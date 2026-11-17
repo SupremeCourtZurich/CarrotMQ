@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>14.0</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+
+        <IsPackable>false</IsPackable>
+        <IsTestProject>true</IsTestProject>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="meziantou.analyzer" Version="3.0.147">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="MSTest" Version="4.3.3" />
+        <PackageReference Include="Testcontainers.RabbitMq" Version="4.13.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\CarrotMQ.Core\CarrotMQ.Core.csproj" />
+        <ProjectReference Include="..\CarrotMQ.RabbitMQ\CarrotMQ.RabbitMQ.csproj" />
+    </ItemGroup>
+</Project>

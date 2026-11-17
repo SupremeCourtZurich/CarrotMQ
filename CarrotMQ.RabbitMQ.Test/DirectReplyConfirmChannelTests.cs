@@ -30,7 +30,7 @@ public class DirectReplyConfirmChannelTests
         _sut = await DirectReplyConfirmChannel.CreateAsync(
                 CreateConnection(),
                 TimeSpan.FromMilliseconds(20),
-                new PublisherConfirmOptions { RetryLimit = 5 },
+                new PublisherConfirmOptions { RetryLimit = 5, IsolateRefusedPublishes = true },
                 CreateSerializer(),
                 TestLoggerFactory.Instance)
             .ConfigureAwait(false);

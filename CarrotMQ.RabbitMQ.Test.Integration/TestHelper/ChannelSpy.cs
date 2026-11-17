@@ -20,6 +20,7 @@ namespace CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
 internal sealed class ChannelSpy
 {
     private static readonly ProxyGenerator Generator = new();
+    private readonly ConcurrentBag<PublisherConfirmChannel> _confirmChannels = [];
     private readonly ConcurrentBag<ChannelInterceptor> _mainChannels = [];
     private int _mainChannelPublishes;
     private TaskCompletionSource<bool> _mainChannelClosed = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -36,8 +37,8 @@ internal sealed class ChannelSpy
     }
 
     /// <summary>
-    /// Holds the recovery of closed main channels until the returned scope is disposed; publishes meanwhile go to the closed
-    /// channel and are handed over together with the ones that were outstanding at the close.
+    /// Holds the recovery of closed main channels until the returned scope is disposed; publishes meanwhile wait for the
+    /// reopen and are handed over together with the ones that were outstanding at the close.
     /// </summary>
     public IDisposable HoldMainChannelRecovery()
     {
@@ -57,12 +58,18 @@ internal sealed class ChannelSpy
     /// </summary>
     public async Task<Task<T>> PublishInOrderAsync<T>(Func<Task<T>> publish)
     {
-        var before = Volatile.Read(ref _mainChannelPublishes);
+        var before = AcceptedPublishes();
         var task = publish();
-        await Wait.UntilAsync(() => Volatile.Read(ref _mainChannelPublishes) > before || task.IsCompleted, "publish on a main channel")
+        await Wait.UntilAsync(() => AcceptedPublishes() > before || task.IsCompleted, "publish accepted by a confirm channel")
             .ConfigureAwait(false);
 
         return task;
+    }
+
+    // Sent on a main channel, or queued while the main channel is closed.
+    private int AcceptedPublishes()
+    {
+        return Volatile.Read(ref _mainChannelPublishes) + _confirmChannels.Sum(c => c.PublishedOnClosedChannelCount);
     }
 
     /// <inheritdoc cref="PublishInOrderAsync{T}" />
@@ -143,24 +150,30 @@ internal sealed class ChannelSpy
 
         private async Task<IPublisherChannel> CreatePublisherConfirmChannelAsync(IBrokerConnection brokerConnection)
         {
-            return await PublisherConfirmChannel.CreateAsync(
+            var channel = await PublisherConfirmChannel.CreateAsync(
                     await ConnectAsync(brokerConnection).ConfigureAwait(false),
                     brokerConnection.NetworkRecoveryInterval,
                     _options.PublisherConfirm,
                     _protocolSerializer,
                     _loggerFactory)
                 .ConfigureAwait(false);
+            _spy._confirmChannels.Add((PublisherConfirmChannel)channel);
+
+            return channel;
         }
 
         private async Task<IDirectReplyChannel> CreateDirectReplyConfirmChannelAsync(IBrokerConnection brokerConnection)
         {
-            return await DirectReplyConfirmChannel.CreateAsync(
+            var channel = await DirectReplyConfirmChannel.CreateAsync(
                     await ConnectAsync(brokerConnection).ConfigureAwait(false),
                     brokerConnection.NetworkRecoveryInterval,
                     _options.PublisherConfirm,
                     _protocolSerializer,
                     _loggerFactory)
                 .ConfigureAwait(false);
+            _spy._confirmChannels.Add((PublisherConfirmChannel)channel);
+
+            return channel;
         }
 
         private async Task<IConnection> ConnectAsync(IBrokerConnection brokerConnection)

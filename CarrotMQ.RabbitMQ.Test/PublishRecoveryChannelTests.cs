@@ -127,12 +127,19 @@ public class PublishRecoveryChannelTests
         Assert.IsTrue(timedOut.Channel.Disposed);
     }
 
+    [DataRow((ushort)404, "NOT_FOUND - no exchange 'exchange'", PublishFailureReason.DestinationNotFound)]
+    [DataRow((ushort)403, "ACCESS_REFUSED - cannot publish to internal exchange", PublishFailureReason.AccessRefused)]
+    [DataRow((ushort)406, "PRECONDITION_FAILED - user_id property mismatch", PublishFailureReason.MessageRejected)]
     [TestMethod]
     [Timeout(5_000)]
-    public async Task Refusal_RefusedMessageIsRetriedOnAnotherChannelAndTheOthersAreConfirmed()
+    public async Task Refusal_RefusedMessageFailsAtOnceWithTheBrokersReasonAndTheOthersAreConfirmed(
+        ushort replyCode,
+        string replyText,
+        PublishFailureReason expectedReason)
     {
         // Arrange
-        var sut = CreateSut(retryLimit: 1_000, retryInterval: Short);
+        var sut = CreateSut();
+        _broker.RefusalReason = new ShutdownEventArgs(ShutdownInitiator.Peer, replyCode, replyText, 60, 40);
         var bad = _broker.Message("bad", Answer.Refuse);
         var good = _broker.Message("good");
 
@@ -140,30 +147,52 @@ public class PublishRecoveryChannelTests
         sut.Enqueue(bad.Message);
         sut.Enqueue(good.Message);
         await good.Confirmed.ConfigureAwait(false);
-        var retried = await _broker.WaitForPublishAsync(bad, occurrence: 2).ConfigureAwait(false);
-        await sut.DisposeAsync().ConfigureAwait(false);
+        await _broker.WaitUntilAsync(() => bad.Confirmed.IsCompleted).ConfigureAwait(false);
 
         // Assert
-        Assert.AreNotSame(_broker.PublishesOf(good).Single().Channel, retried.Channel);
-        Assert.IsFalse(bad.Confirmed.IsCompleted);
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad.Confirmed).ConfigureAwait(false);
+        Assert.AreEqual(expectedReason, exception.Reason);
+        Assert.IsTrue(exception.Message.IndexOf(replyText, StringComparison.Ordinal) >= 0, exception.Message);
+        Assert.AreEqual(replyCode, ((AlreadyClosedException)exception.InnerException!).ShutdownReason!.ReplyCode);
+        _broker.AssertLog("publish bad", "refuse bad", "publish good", "ack good");
     }
 
     [TestMethod]
     [Timeout(5_000)]
-    public async Task RefusedOnEveryAttempt_FailsAfterRetryLimitPublishes()
+    public async Task NackedOnEveryAttempt_FailsAfterRetryLimitPublishesWithAnUnknownReason()
     {
         // Arrange
         const uint retryLimit = 3;
         var sut = CreateSut(retryLimit, Short);
-        var bad = _broker.Message("bad", Answer.Refuse);
+        var message = _broker.Message("m", Answer.Nack);
 
         // Act
-        sut.Enqueue(bad.Message);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad.Confirmed).ConfigureAwait(false);
+        sut.Enqueue(message.Message);
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => message.Confirmed).ConfigureAwait(false);
         await sut.DisposeAsync().ConfigureAwait(false);
 
         // Assert
-        Assert.AreEqual((int)retryLimit, _broker.PublishesOf(bad).Count);
+        Assert.AreEqual(PublishFailureReason.Unknown, exception.Reason);
+        Assert.AreEqual((int)retryLimit, _broker.PublishesOf(message).Count);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ConnectionLostOnEveryAttempt_FailsAfterRetryLimitPublishesAsUnreachable()
+    {
+        // Arrange
+        const uint retryLimit = 3;
+        var sut = CreateSut(retryLimit, Short, networkRecoveryInterval: Short);
+        var message = _broker.Message("m", Answer.LoseConnection);
+
+        // Act
+        sut.Enqueue(message.Message);
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => message.Confirmed).ConfigureAwait(false);
+        await sut.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason);
+        Assert.AreEqual((int)retryLimit, _broker.PublishesOf(message).Count);
     }
 
     [TestMethod]
@@ -173,7 +202,7 @@ public class PublishRecoveryChannelTests
         // Arrange
         var sut = CreateSut(retryInterval: Short);
         var message = _broker.Message("m", Answer.None, Answer.Nack, Answer.Ack);
-        _broker.BeforeAnswer = published =>
+        _broker.BeforeAnswer = _ =>
         {
             if (_broker.PublishesOf(message).Count == 2) _broker.Ack(_broker.Publishes[0]);
         };
@@ -230,7 +259,7 @@ public class PublishRecoveryChannelTests
         // Arrange
         var sut = CreateSut(retryInterval: Short);
         var message = _broker.Message("m", Answer.None, Answer.Ack);
-        _broker.BeforeAnswer = published =>
+        _broker.BeforeAnswer = _ =>
         {
             if (_broker.PublishesOf(message).Count == 2) _broker.Publishes[0].Channel.Close(ConnectionLost);
         };
@@ -452,27 +481,6 @@ public class PublishRecoveryChannelTests
     }
 
     [TestMethod]
-    [Timeout(5_000)]
-    public async Task QuarantinedRequestConfirmed_RefusedRetriesWaitForItsReply()
-    {
-        // Arrange
-        var sut = CreateSut(retryInterval: Short);
-        var request = _broker.Message("request", Answer.Refuse, Answer.Refuse, Answer.Ack);
-        var bad = _broker.Message("bad", Answer.Refuse);
-        var reply = ExpectReply(request);
-
-        // Act
-        sut.Enqueue(request.Message);
-        sut.Enqueue(bad.Message);
-        await request.Confirmed.ConfigureAwait(false);
-        reply.Arrive();
-        await _broker.WaitUntilAsync(() => _broker.Happened("reply request", then: "publish bad")).ConfigureAwait(false);
-
-        // Assert
-        _broker.AssertNothingBetween("ack request", "reply request", "publish bad");
-    }
-
-    [TestMethod]
     [Timeout(10_000)]
     public async Task EnqueueRacingTheIdleShutdown_EveryMessageIsPublished()
     {
@@ -614,6 +622,8 @@ public class PublishRecoveryChannelTests
 
         public int FailedOpensAfterConnectionLoss { get; set; }
 
+        public ShutdownEventArgs RefusalReason { get; set; } = Refusal;
+
         public Exception? ThrowOnNextPublish { get; set; }
 
         public Action<Published>? BeforeAnswer { get; set; }
@@ -660,7 +670,7 @@ public class PublishRecoveryChannelTests
                     break;
                 case Answer.Refuse:
                     Record($"refuse {published.Name}");
-                    published.Channel.Close(Refusal);
+                    published.Channel.Close(RefusalReason);
                     break;
                 case Answer.LoseConnection:
                     Record($"lose connection {published.Name}");
@@ -691,26 +701,9 @@ public class PublishRecoveryChannelTests
             return PublishesOf(message)[occurrence - 1];
         }
 
-        public bool Happened(string first, string then)
-        {
-            var log = Snapshot();
-            var index = log.IndexOf(first);
-
-            return index >= 0 && log.Skip(index + 1).Contains(then, StringComparer.Ordinal);
-        }
-
         public void AssertLog(params string[] expected)
         {
             CollectionAssert.AreEqual(expected, Snapshot(), string.Join(", ", Snapshot()));
-        }
-
-        public void AssertNothingBetween(string from, string to, string forbidden)
-        {
-            var log = Snapshot();
-            var start = log.IndexOf(from);
-            var end = log.IndexOf(to);
-            Assert.IsTrue(start >= 0 && end > start, string.Join(", ", log));
-            CollectionAssert.DoesNotContain(log.GetRange(start, end - start), forbidden, string.Join(", ", log));
         }
 
         public async Task WaitUntilAsync(Func<bool> condition)

@@ -22,6 +22,19 @@ public sealed class AsyncLock
         return new Scope(_lock);
     }
 
+    /// <summary>
+    /// Asynchronously acquires the lock unless <paramref name="token" /> is cancelled first.
+    /// </summary>
+    /// <param name="token">Cancels the wait for the lock.</param>
+    /// <returns>An awaitable task that yields a disposable object representing the lock scope.</returns>
+    /// <exception cref="OperationCanceledException">The token was cancelled before the lock was acquired.</exception>
+    public async Task<IDisposable> LockAsync(CancellationToken token)
+    {
+        await _lock.WaitAsync(token).ConfigureAwait(false);
+
+        return new Scope(_lock);
+    }
+
     private readonly struct Scope : IDisposable
     {
         private readonly SemaphoreSlim _lock;

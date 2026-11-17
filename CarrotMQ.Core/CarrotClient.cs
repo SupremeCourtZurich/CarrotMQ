@@ -147,15 +147,22 @@ public sealed class CarrotClient : ICarrotClient
         }
 
         CarrotMessage responseMessage;
-        if (message.Header.MessageProperties.Ttl > 0)
+        try
         {
-            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
-            responseMessage = await _transport.SendReceiveAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+            if (message.Header.MessageProperties.Ttl > 0)
+            {
+                using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
+                responseMessage = await _transport.SendReceiveAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                responseMessage = await _transport.SendReceiveAsync(message, cancellationToken).ConfigureAwait(false);
+            }
         }
-        else
+        catch (PublishFailedException ex) when (IsCancelledByCaller(ex, cancellationToken))
         {
-            responseMessage = await _transport.SendReceiveAsync(message, cancellationToken).ConfigureAwait(false);
+            throw new OperationCanceledException(ex.Message, ex, cancellationToken);
         }
 
         CarrotResponse<TRequest, TResponse> response;
@@ -180,15 +187,28 @@ public sealed class CarrotClient : ICarrotClient
         CarrotMessage message,
         CancellationToken cancellationToken)
     {
-        if (message.Header.MessageProperties.Ttl > 0)
+        try
         {
-            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
-            await _transport.SendAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+            if (message.Header.MessageProperties.Ttl > 0)
+            {
+                using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
+                await _transport.SendAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+            }
+            else
+            {
+                await _transport.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            }
         }
-        else
+        catch (PublishFailedException ex) when (IsCancelledByCaller(ex, cancellationToken))
         {
-            await _transport.SendAsync(message, cancellationToken).ConfigureAwait(false);
+            throw new OperationCanceledException(ex.Message, ex, cancellationToken);
         }
+    }
+
+    // The transport cannot tell the caller's token from the TTL, so a cancelled publish fails the same for both.
+    private static bool IsCancelledByCaller(PublishFailedException exception, CancellationToken cancellationToken)
+    {
+        return exception.InnerException is OperationCanceledException && cancellationToken.IsCancellationRequested;
     }
 }

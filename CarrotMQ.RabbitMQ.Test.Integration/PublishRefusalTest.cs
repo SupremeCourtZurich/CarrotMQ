@@ -32,7 +32,6 @@ public class PublishRefusalTest
     // Always exists; with an unbound routing key the broker confirms at once.
     private const string ExistingExchange = "amq.direct";
     private const string MissingExchange = "test.publish.refusal.missing.exchange";
-    private const string LateExchange = "test.publish.refusal.late.exchange";
 
     private readonly LogRecorder _producerLog = new();
     private readonly ChannelSpy _spy = new();
@@ -45,7 +44,6 @@ public class PublishRefusalTest
     public async Task Initialize()
     {
         RefusalTestQueryHandler.Reset();
-        await TestBase.RabbitApi.DeleteExchangeAsync(LateExchange).ConfigureAwait(false);
         _consumer = CreateConsumer();
         _producer = CreateProducer();
         _client = _producer.Host.Services.GetRequiredService<ICarrotClient>();
@@ -55,11 +53,10 @@ public class PublishRefusalTest
     }
 
     [TestCleanup]
-    public async Task Cleanup()
+    public void Cleanup()
     {
         _producer.Dispose();
         _consumer.Dispose();
-        await TestBase.RabbitApi.DeleteExchangeAsync(LateExchange).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -81,7 +78,7 @@ public class PublishRefusalTest
 
         // Assert
         await Task.WhenAll(before.Concat(behind)).ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
+        await AssertRefusedAsync(bad, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -106,7 +103,7 @@ public class PublishRefusalTest
 
             // Assert
             await Task.WhenAll(behind).ConfigureAwait(false);
-            await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
+            await AssertRefusedAsync(bad, PublishFailureReason.AccessRefused).ConfigureAwait(false);
         }
         finally
         {
@@ -132,23 +129,21 @@ public class PublishRefusalTest
 
         // Assert
         await Task.WhenAll(good1.Concat(good2)).ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad1).ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad2).ConfigureAwait(false);
+        await AssertRefusedAsync(bad1, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
+        await AssertRefusedAsync(bad2, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
     }
 
     [TestMethod]
     [Timeout(30_000)]
-    public async Task PublishToMissingExchange_ExchangeDeclaredWhileRetrying_IsConfirmed()
+    public async Task PublishToMissingExchange_FailsOnceIdentifiedWithTheBrokersReason()
     {
-        // Arrange
-        var late = await PublishEventAsync(LateExchange).ConfigureAwait(false);
-        await _producerLog.WaitForRefusalsAsync(1).ConfigureAwait(false);
-
         // Act
-        await TestBase.RabbitApi.DeclareExchangeAsync(LateExchange, "fanout").ConfigureAwait(false);
+        var bad = await PublishEventAsync(MissingExchange).ConfigureAwait(false);
 
         // Assert
-        await late.ConfigureAwait(false);
+        var exception = await AssertRefusedAsync(bad, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
+        Assert.IsTrue(exception.Message.IndexOf(MissingExchange, StringComparison.Ordinal) >= 0, exception.Message);
+        Assert.AreEqual(1, _producerLog.Refusals);
     }
 
     [TestMethod]
@@ -167,7 +162,7 @@ public class PublishRefusalTest
 
         // Assert
         Assert.AreEqual(2, (await behind.ConfigureAwait(false)).Content?.Id);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
+        await AssertRefusedAsync(bad, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -194,8 +189,8 @@ public class PublishRefusalTest
         // Assert
         Assert.AreEqual(2, (await between.ConfigureAwait(false)).Content?.Id);
         Assert.AreEqual(1, refusalsWhileTheHandlerRuns, "the second refused query was published while the reply was pending");
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad1).ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad2).ConfigureAwait(false);
+        await AssertRefusedAsync(bad1, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
+        await AssertRefusedAsync(bad2, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -216,31 +211,7 @@ public class PublishRefusalTest
         // Assert
         Assert.AreEqual(3, (await behind.ConfigureAwait(false)).Content?.Id);
         await Assert.ThrowsAsync<OperationCanceledException>(() => unanswered).ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
-    }
-
-    [TestMethod]
-    [Timeout(30_000)]
-    public async Task QuarantinedQuery_ExchangeDeclaredWhileAnotherRefusedQueryRetries_GetsItsReply()
-    {
-        // Arrange
-        Task bad;
-        Task<CarrotResponse<LateExchangeQuery, RefusalTestQuery.Response>> late;
-        using (_spy.HoldMainChannelRecovery())
-        {
-            bad = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
-            await _spy.WaitForMainChannelCloseAsync().ConfigureAwait(false);
-            late = await QueryAsync(new LateExchangeQuery { Id = 4 }).ConfigureAwait(false);
-        }
-
-        await _producerLog.WaitForRefusalsAsync(2).ConfigureAwait(false);
-
-        // Act
-        await DeclareLateExchangeRoutedToTheHandlersAsync().ConfigureAwait(false);
-
-        // Assert
-        Assert.AreEqual(4, (await late.ConfigureAwait(false)).Content?.Id);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
+        await AssertRefusedAsync(bad, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
     }
 
     // Documents at-least-once: the broker routed the query, but the close cut off its confirm, so it is published again.
@@ -256,7 +227,7 @@ public class PublishRefusalTest
         var bad = await QueryAsync(new MissingExchangeQuery()).ConfigureAwait(false);
         var response = await routed.ConfigureAwait(false);
         await Wait.UntilAsync(() => RefusalTestQueryHandler.Runs(5) >= 2, "second handler run").ConfigureAwait(false);
-        await Assert.ThrowsAsync<RetryLimitExceededException>(() => bad).ConfigureAwait(false);
+        await AssertRefusedAsync(bad, PublishFailureReason.DestinationNotFound).ConfigureAwait(false);
 
         // Assert
         Assert.AreEqual(5, response.Content?.Id);
@@ -272,7 +243,6 @@ public class PublishRefusalTest
                 var exchange = builder.Exchanges.AddDirect<RefusalTestExchange>();
                 var queue = builder.Queues.AddQuorum(QueueName).WithConsumer(c => c.WithSingleAck());
                 builder.Handlers.AddQuery<RefusalTestQueryHandler, RefusalTestQuery, RefusalTestQuery.Response>().BindTo(exchange, queue);
-                builder.Handlers.AddQuery<LateExchangeQueryHandler, LateExchangeQuery, RefusalTestQuery.Response>().BindTo(exchange, queue);
                 builder.StartAsHostedService();
             });
     }
@@ -289,6 +259,7 @@ public class PublishRefusalTest
                     TestBase.ConfigureBroker(options);
                     options.ServiceName = producerName;
                     options.PublisherConfirm.RetryLimit = RetryLimit;
+                    options.PublisherConfirm.IsolateRefusedPublishes = true;
                 }),
             services =>
             {
@@ -319,7 +290,10 @@ public class PublishRefusalTest
     private async Task<Task[]> PublishEventsAsync(string exchange, int count)
     {
         var published = new Task[count];
-        for (var i = 0; i < count; i++) published[i] = await PublishEventAsync(exchange).ConfigureAwait(false);
+        for (var i = 0; i < count; i++)
+        {
+            published[i] = await PublishEventAsync(exchange).ConfigureAwait(false);
+        }
 
         return published;
     }
@@ -335,18 +309,17 @@ public class PublishRefusalTest
         return _spy.PublishInOrderAsync(() => _client.SendReceiveAsync(query, messageProperties: properties));
     }
 
-    // A fanout exchange bound to RefusalTestExchange, which routes the query to its handler.
-    private static async Task DeclareLateExchangeRoutedToTheHandlersAsync()
+    private static async Task<RetryLimitExceededException> AssertRefusedAsync(Task publish, PublishFailureReason reason)
     {
-        await TestBase.RabbitApi.DeclareExchangeAsync(LateExchange, "fanout").ConfigureAwait(false);
-        await TestBase.RabbitApi.BindExchangeAsync(LateExchange, RefusalTestExchange.Name, string.Empty).ConfigureAwait(false);
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => publish).ConfigureAwait(false);
+        Assert.AreEqual(reason, exception.Reason, exception.Message);
+
+        return exception;
     }
 
     public class RefusalTestExchange : ExchangeEndPoint
     {
-        public const string Name = "test.publish.refusal.exchange";
-
-        public RefusalTestExchange() : base(Name)
+        public RefusalTestExchange() : base("test.publish.refusal.exchange")
         {
         }
     }
@@ -354,13 +327,6 @@ public class PublishRefusalTest
     public class MissingExchangeEndPoint : ExchangeEndPoint
     {
         public MissingExchangeEndPoint() : base(MissingExchange)
-        {
-        }
-    }
-
-    public class LateExchangeEndPoint : ExchangeEndPoint
-    {
-        public LateExchangeEndPoint() : base(LateExchange)
         {
         }
     }
@@ -389,17 +355,12 @@ public class PublishRefusalTest
 
     public class UnansweredQuery : IQuery<UnansweredQuery, RefusalTestQuery.Response, UnroutedEndPoint>;
 
-    public class LateExchangeQuery : IQuery<LateExchangeQuery, RefusalTestQuery.Response, LateExchangeEndPoint>
-    {
-        public int Id { get; set; }
-    }
-
     /// <summary>
     /// Answers with the query's id, counts its runs per id, and holds queries with <c>WaitForGate</c> until the gate opens.
     /// </summary>
     public sealed class RefusalTestQueryHandler : QueryHandlerBase<RefusalTestQuery, RefusalTestQuery.Response>
     {
-        private static readonly ConcurrentDictionary<int, int> s_runs = new();
+        private static readonly ConcurrentDictionary<int, int> RunsById = new();
         private static TaskCompletionSource<bool> s_gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private static TaskCompletionSource<bool> s_gateReached = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -407,7 +368,7 @@ public class PublishRefusalTest
 
         public static int Runs(int id)
         {
-            return s_runs.TryGetValue(id, out var runs) ? runs : 0;
+            return RunsById.TryGetValue(id, out var runs) ? runs : 0;
         }
 
         public static void OpenGate()
@@ -417,7 +378,7 @@ public class PublishRefusalTest
 
         public static void Reset()
         {
-            s_runs.Clear();
+            RunsById.Clear();
             s_gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             s_gateReached = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         }
@@ -427,7 +388,7 @@ public class PublishRefusalTest
             ConsumerContext consumerContext,
             CancellationToken cancellationToken)
         {
-            s_runs.AddOrUpdate(query.Id, 1, (_, runs) => runs + 1);
+            RunsById.AddOrUpdate(query.Id, 1, (_, runs) => runs + 1);
             if (query.WaitForGate)
             {
                 s_gateReached.TrySetResult(true);
@@ -435,17 +396,6 @@ public class PublishRefusalTest
             }
 
             return Ok(new RefusalTestQuery.Response { Id = query.Id });
-        }
-    }
-
-    public sealed class LateExchangeQueryHandler : QueryHandlerBase<LateExchangeQuery, RefusalTestQuery.Response>
-    {
-        public override Task<IHandlerResult> HandleAsync(
-            LateExchangeQuery query,
-            ConsumerContext consumerContext,
-            CancellationToken cancellationToken)
-        {
-            return Task.FromResult(Ok(new RefusalTestQuery.Response { Id = query.Id }));
         }
     }
 }
