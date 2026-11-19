@@ -19,6 +19,7 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
 {
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly SerialPublisher _recovery;
+    private int _disposed;
 
     public PublishRecoveryChannel(
         IConnection connection,
@@ -61,8 +62,11 @@ internal sealed class PublishRecoveryChannel : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+
         _disposeCts.Cancel();
         await _recovery.DisposeAsync().ConfigureAwait(false);
+        _disposeCts.Dispose();
     }
 
     private sealed class Settings

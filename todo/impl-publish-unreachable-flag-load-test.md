@@ -25,7 +25,7 @@ load test reports flag-on / flag-off ratios.
 - [x] Implement the switch in `FlagAllMessagesForRepublishAsync`; recovery tests and `PublishRefusalTest` opt in
 - [x] Docs: options table, appsettings.md, Refused Publishes section (design artifact: ask first, it is shared live)
 ### 3. Load test `CarrotMQ.RabbitMQ.Test.Load`
-- [x] Console/MSTest project, net10.0, `[TestCategory("Load")]`, excluded in CI
+- [x] Console/MSTest project, net10.0, `[TestCategory("Load")]`, skipped in CI unless `CARROTMQ_LOAD_TEST=1`
 - [x] Two producer hosts (flag off/on), ABBA rounds after warm-up, scenarios 0 / 0.1 / 1 / 10 % refusals + requests 1 %
 - [x] Report median and min–max ratios (throughput, p50, p99 of good messages) + absolute counts (good failed, channel closes)
 ### 4. Verify

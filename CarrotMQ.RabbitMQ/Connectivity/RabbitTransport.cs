@@ -100,7 +100,7 @@ public sealed class RabbitTransport : ITransport
     {
         try
         {
-            return await WaitAsync(getChannel(), token).ConfigureAwait(false);
+            return await CancellableWait.WaitAsync(getChannel(), token).ConfigureAwait(false);
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
         {
@@ -112,29 +112,6 @@ public sealed class RabbitTransport : ITransport
         {
             throw PublishFailure.Unreachable(header, ex);
         }
-    }
-
-    // The channel is shared, so its creation goes on when the caller stops waiting.
-    private static async Task<T> WaitAsync<T>(Task<T> task, CancellationToken token)
-    {
-        if (task.IsCompleted || !token.CanBeCanceled) return await task.ConfigureAwait(false);
-
-        var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using (token.Register(() => cancelled.TrySetResult(true)))
-        {
-            if (await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false) != task)
-            {
-                _ = task.ContinueWith(
-                    static t => t.Exception,
-                    CancellationToken.None,
-                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
-
-                throw new OperationCanceledException(token);
-            }
-        }
-
-        return await task.ConfigureAwait(false);
     }
 
     private void SetHeaderInfos(CarrotHeader header)

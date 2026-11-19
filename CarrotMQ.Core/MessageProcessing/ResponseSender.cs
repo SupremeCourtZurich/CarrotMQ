@@ -52,7 +52,11 @@ public sealed class ResponseSender : IResponseSender
     private async Task SendResponse(CarrotMessage requestMessage, IHandlerResult result)
     {
         var responseMessage = CreateResponseMessage(requestMessage, result);
-        await _transport.SendAsync(responseMessage, CancellationToken.None).ConfigureAwait(false);
+
+        // Once the request's TTL has passed, nobody waits for its response any more.
+        var ttl = responseMessage.Header.MessageProperties.Ttl;
+        using var ttlSource = ttl > 0 ? new CancellationTokenSource(ttl.Value) : null;
+        await _transport.SendAsync(responseMessage, ttlSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
 
         _logger.LogDebug(
             "Published response {CalledMethod}, StatusCode:{StatusCode}",

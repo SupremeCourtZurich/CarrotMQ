@@ -2,6 +2,7 @@ using CarrotMQ.Core;
 using CarrotMQ.Core.Configuration;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
+using CarrotMQ.RabbitMQ.Test.Helper;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -110,7 +111,7 @@ public class RabbitTransportTests
 
     private static async Task AssertCancelledAsync(Task send, PublishFailureReason reason)
     {
-        await WaitUntilAsync(() => send.IsCompleted, "the cancelled send completes while no channel is available").ConfigureAwait(false);
+        await Wait.UntilAsync(() => send.IsCompleted, "the cancelled send completes while no channel is available").ConfigureAwait(false);
         var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => send).ConfigureAwait(false);
         Assert.AreEqual(reason, exception.Reason);
         Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
@@ -149,14 +150,4 @@ public class RabbitTransportTests
         _brokerConnection.CurrentConnection.Returns(connection);
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition, string description)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(4);
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline) throw new TimeoutException($"Not within 4 s: {description}");
-
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-    }
 }

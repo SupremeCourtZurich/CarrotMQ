@@ -44,7 +44,7 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
         var tcs = new TaskCompletionSource<CarrotMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
         _replyMapper.TryAdd(correlationId, tcs);
 
-        token.Register(
+        var registration = token.Register(
             () =>
             {
                 Logger.LogDebug("Cancel publish with direct reply; CorrelationId={CorrelationId}", correlationId);
@@ -53,12 +53,23 @@ internal sealed class DirectReplyConfirmChannel : PublisherConfirmChannel, IDire
             },
             false);
 
-        Logger.LogDebug("Publish with direct reply; CorrelationId={CorrelationId}", correlationId);
-        await PublishAsync(message, token).ConfigureAwait(false);
+        try
+        {
+            Logger.LogDebug("Publish with direct reply; CorrelationId={CorrelationId}", correlationId);
+            await PublishAsync(message, token).ConfigureAwait(false);
 
-        var result = await tcs.Task.ConfigureAwait(false);
+            return await tcs.Task.ConfigureAwait(false);
+        }
+        catch
+        {
+            _replyMapper.TryRemove(correlationId, out _);
 
-        return result;
+            throw;
+        }
+        finally
+        {
+            registration.Dispose();
+        }
     }
 
     protected override BasicProperties CreateBasicProperties(CarrotHeader header)

@@ -579,7 +579,7 @@ public class PublisherConfirmChannelTests
             cts.Cancel();
 
             // Assert
-            await WaitUntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the broker is unreachable")
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the broker is unreachable")
                 .ConfigureAwait(false);
             await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
         }
@@ -605,7 +605,7 @@ public class PublisherConfirmChannelTests
             cts.Cancel();
 
             // Assert
-            await WaitUntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the channel is reopened")
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the channel is reopened")
                 .ConfigureAwait(false);
             await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
         }
@@ -632,6 +632,152 @@ public class PublisherConfirmChannelTests
 
     [TestMethod]
     [Timeout(5_000)]
+    public async Task ChannelRecoveredByTheClient_TimedOutMessagesRepublished_MultipleAckConfirmsThem()
+    {
+        // Arrange
+        var tasks = PublishAsync(3, CancellationToken.None);
+        BrokerClosesTheChannelAndClientRecoversIt(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED"));
+        await RepublishAsync(1).ConfigureAwait(false);
+        ClientReopensTheChannelWithNewSequenceNumbers();
+
+        // Act
+        await RepublishAsync(1, roundsDone: 1).ConfigureAwait(false);
+        AckMessage((ulong)_channelDeliveryTagCounter, multiAck: true);
+
+        // Assert
+        await Wait.UntilAsync(() => tasks.All(t => t.IsCompleted), "the republished messages are confirmed").ConfigureAwait(false);
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelRecoveredByTheClient_PublishBeforeTheRetryInterval_AllMessagesAreConfirmed()
+    {
+        // Arrange
+        var outstanding = PublishAsync(3, CancellationToken.None);
+        BrokerClosesTheChannelAndClientRecoversIt(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED"));
+        ClientReopensTheChannelWithNewSequenceNumbers();
+        var next = PublishAsync(1, CancellationToken.None).Single();
+
+        // Act
+        AckMessage(1);
+        await RepublishAsync(1).ConfigureAwait(false);
+        AckMessage((ulong)_channelDeliveryTagCounter, multiAck: true);
+
+        // Assert
+        Task[] all = [.. outstanding, next];
+        await Wait.UntilAsync(() => all.All(t => t.IsCompleted), "every message is confirmed").ConfigureAwait(false);
+        await Task.WhenAll(all).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosed_DisposedWhileAMessageWaitsForTheReopen_PublishFails()
+    {
+        // Arrange
+        BrokerClosesTheChannelAndClientRecoversIt(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED"));
+        var publish = PublishOneAsync();
+
+        // Act
+        _disposed = true;
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the waiting publish completes once the channel is disposed").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => publish).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task DisposedWhileWaitingForTheConfirm_PublishFails()
+    {
+        // Arrange
+        var publish = PublishAsync(1, CancellationToken.None).Single();
+
+        // Act
+        _disposed = true;
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the unconfirmed publish completes once the channel is disposed").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => publish).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task DisposedWhileARefusedMessageWaitsOnTheRecoveryChannel_PublishFails()
+    {
+        // Arrange
+        var recoveryChannel = UseRecoveryChannel();
+        var publish = PublishAsync(1, CancellationToken.None).Single();
+        RefuseMainChannel();
+        await recoveryChannel.WaitForPublishAsync(1).ConfigureAwait(false);
+
+        // Act
+        _disposed = true;
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the publish on the recovery channel completes once disposed").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => publish).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task PublishFailsMidSend_NextPublishReusesTheSequenceNumber_InFlightMessagesAreNotRepublished()
+    {
+        // Arrange
+        var inFlight = PublishAsync(1, CancellationToken.None).Single();
+        NextSendFailsAndGivesItsSequenceNumberBack();
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => PublishOneAsync()).ConfigureAwait(false);
+        var next = PublishAsync(1, CancellationToken.None).Single();
+
+        // Act
+        AckMessage(2, multiAck: true);
+
+        // Assert
+        await Wait.UntilAsync(() => inFlight.IsCompleted && next.IsCompleted, "both sent messages are confirmed").ConfigureAwait(false);
+        await RepublishAsync(1).ConfigureAwait(false);
+        await VerifyBasicPublishAsync(3).ConfigureAwait(false);
+    }
+
+    // The client gives the sequence number of a failed send back to the next publish.
+    private void NextSendFailsAndGivesItsSequenceNumberBack()
+    {
+        var failNextSend = true;
+#if NET
+        _channel.GetNextPublishSequenceNumberAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => Volatile.Read(ref failNextSend) ? _channelDeliveryTagCounter + 1 : Interlocked.Increment(ref _channelDeliveryTagCounter));
+#else
+        _channel.GetNextPublishSequenceNumberAsync(Arg.Any<CancellationToken>())
+            .Returns(_ => (ulong)(Volatile.Read(ref failNextSend) ? _channelDeliveryTagCounter + 1 : Interlocked.Increment(ref _channelDeliveryTagCounter)));
+#endif
+        _channel.When(async c => await c.BasicPublishAsync(
+                    Arg.Any<string>(),
+                    Arg.Any<string>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<BasicProperties>(),
+                    Arg.Any<ReadOnlyMemory<byte>>(),
+                    Arg.Any<CancellationToken>())
+                .ConfigureAwait(false))
+            .Do(_ =>
+            {
+                if (!Volatile.Read(ref failNextSend)) return;
+
+                Volatile.Write(ref failNextSend, false);
+                throw new InvalidOperationException("send failed");
+            });
+    }
+
+    // The client recovers a channel as a new channel, whose publish sequence numbers start at 1 again.
+    private void ClientReopensTheChannelWithNewSequenceNumbers()
+    {
+        _channelDeliveryTagCounter = 0;
+        _channel.IsOpen.Returns(true);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
     public async Task MultipleAckCoversACancelledPublish_LaterPublishesAreConfirmed()
     {
         // Arrange
@@ -645,7 +791,7 @@ public class PublisherConfirmChannelTests
         AckMessage(3, multiAck: true);
 
         // Assert
-        await WaitUntilAsync(() => later.All(t => t.IsCompleted), "the later publishes are confirmed").ConfigureAwait(false);
+        await Wait.UntilAsync(() => later.All(t => t.IsCompleted), "the later publishes are confirmed").ConfigureAwait(false);
         await Task.WhenAll(later).ConfigureAwait(false);
     }
 
@@ -726,21 +872,11 @@ public class PublisherConfirmChannelTests
     private static Task WaitForCallsAsync<T>(T substitute, string methodName, int count)
         where T : class
     {
-        return WaitUntilAsync(
+        return Wait.UntilAsync(
             () => substitute.ReceivedCalls().Count(c => string.Equals(c.GetMethodInfo().Name, methodName, StringComparison.Ordinal)) >= count,
             $"{methodName} called {count} times");
     }
 
-    private static async Task WaitUntilAsync(Func<bool> condition, string description)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(4);
-        while (!condition())
-        {
-            if (DateTime.UtcNow > deadline) throw new TimeoutException($"Not within 4 s: {description}");
-
-            await Task.Delay(10).ConfigureAwait(false);
-        }
-    }
 
     private async Task<PublisherConfirmChannel> CreatePublisherConfirmChannelAsync()
     {

@@ -31,8 +31,9 @@ public interface ICarrotClient
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
@@ -62,8 +63,9 @@ public interface ICarrotClient
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
@@ -99,8 +101,9 @@ public interface ICarrotClient
     /// been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
@@ -137,8 +140,9 @@ public interface ICarrotClient
     /// been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
@@ -174,8 +178,9 @@ public interface ICarrotClient
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
@@ -213,8 +218,9 @@ public interface ICarrotClient
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />.
     /// </exception>
     /// <exception cref="PublishFailedException">
-    /// Thrown if no connection to the broker could be established, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it.
+    /// Thrown if no connection to the broker could be established, the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired before the broker confirmed it, or, without publisher confirms,
+    /// the channel was closed while the message was being sent.
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">

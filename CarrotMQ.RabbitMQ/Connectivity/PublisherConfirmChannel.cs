@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using CarrotMQ.Core.Common;
@@ -28,6 +29,7 @@ internal class PublisherConfirmChannel : PublisherChannel
     private readonly uint _recoveryChannelIdleTimeoutInMs;
     private readonly uint _retryIntervalInMs;
     private readonly AsyncLock _tailSeqNoLock = new();
+    private readonly CancellationTokenSource _disposeCts = new();
     private readonly IIntervalTimer _timer;
     private PublishRecoveryChannel? _recoveryChannel;
     private bool _recoveryChannelDisposed;
@@ -134,11 +136,14 @@ internal class PublisherConfirmChannel : PublisherChannel
 #if NET
         var reg = token.Register(() => { confirmMessage.CompletionSource.TrySetCanceled(); });
         await using var unused = reg.ConfigureAwait(false);
+        var disposeReg = _disposeCts.Token.Register(() => tcs.TrySetException(new ObjectDisposedException(nameof(PublisherConfirmChannel))));
+        await using var unusedDispose = disposeReg.ConfigureAwait(false);
 #else
 #pragma warning disable IDE0063
         // IAsyncDisposable does not exist in .NET Standard --> call 'using' without 'await' --> calling .Dispose() instead of .DisposeAsync()
         // ReSharper disable once ConvertToUsingDeclaration
         using var unused = token.Register(() => { confirmMessage.CompletionSource.TrySetCanceled(); });
+        using var unusedDispose = _disposeCts.Token.Register(() => tcs.TrySetException(new ObjectDisposedException(nameof(PublisherConfirmChannel))));
 #pragma warning restore IDE0063
 #endif
         try
@@ -175,9 +180,14 @@ internal class PublisherConfirmChannel : PublisherChannel
             return;
         }
 
+        var seqNo = await Channel!.GetNextPublishSequenceNumberAsync(confirmMessage.CancellationToken).ConfigureAwait(false);
+
+        // The client restarts sequence numbers on a channel it recovered by itself.
+        if (seqNo <= _lastPublishedSeqNo) await FlagAllMessagesForRepublishAsync(false).ConfigureAwait(false);
+
         confirmMessage.PublishedAt = _dateTimeProvider.Now;
-        confirmMessage.SeqNo = await Channel!.GetNextPublishSequenceNumberAsync(confirmMessage.CancellationToken).ConfigureAwait(false);
-        _lastPublishedSeqNo = confirmMessage.SeqNo;
+        confirmMessage.SeqNo = seqNo;
+        _lastPublishedSeqNo = seqNo;
         _outstandingConfirms.TryAdd(confirmMessage.SeqNo, confirmMessage);
 
         var header = confirmMessage.MessageHeader;
@@ -194,17 +204,19 @@ internal class PublisherConfirmChannel : PublisherChannel
                 .ConfigureAwait(false);
             Logger.LogTrace("Published message: channel={ChannelNumber}, seq={SeqNo}", Channel?.ChannelNumber, confirmMessage.SeqNo);
         }
-        catch (AlreadyClosedException exception)
+        catch (Exception exception)
         {
-            Logger.LogWarning(exception, "Channel was already closed when publishing. Publish is enqueued for retry.");
-            if (exception.ShutdownReason != null) PublishFailure.RecordClose(confirmMessage, exception.ShutdownReason);
-
             // A failed publish does not advance the sequence number, so the next one reuses it: keep the message by order.
             if (_outstandingConfirms.TryGetValue(confirmMessage.SeqNo, out var tracked) && ReferenceEquals(tracked, confirmMessage))
             {
                 _outstandingConfirms.TryRemove(confirmMessage.SeqNo, out _);
             }
 
+            if (_lastPublishedSeqNo == confirmMessage.SeqNo) _lastPublishedSeqNo--;
+            if (exception is not AlreadyClosedException closed) throw;
+
+            Logger.LogWarning(closed, "Channel was already closed when publishing. Publish is enqueued for retry.");
+            if (closed.ShutdownReason != null) PublishFailure.RecordClose(confirmMessage, closed.ShutdownReason);
             _publishedOnClosedChannel.Enqueue(confirmMessage);
         }
     }
@@ -247,6 +259,9 @@ internal class PublisherConfirmChannel : PublisherChannel
     {
         _timer.Dispose();
 
+        // Fails every publish still waiting for its confirm, its reopen or the recovery channel.
+        _disposeCts.Cancel();
+
         PublishRecoveryChannel? recoveryChannel;
         using (await _tailSeqNoLock.LockAsync().ConfigureAwait(false))
         {
@@ -257,6 +272,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         if (recoveryChannel != null) await recoveryChannel.DisposeAsync().ConfigureAwait(false);
         _outstandingConfirmsCount.Dispose();
         await base.DisposeAsync().ConfigureAwait(false);
+        _disposeCts.Dispose();
     }
 
     private async Task BasicAcksAsync(object sender, BasicAckEventArgs e)
@@ -451,20 +467,29 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// </summary>
     private async Task RepublishTimedOutMessagesAsync()
     {
-        using var scope = await _tailSeqNoLock.LockAsync().ConfigureAwait(false);
-        var republishThresholdTime = _dateTimeProvider.Now.AddMilliseconds(-_retryIntervalInMs);
-        while ((_outstandingConfirms.TryGetValue(_tailSeqNo, out var oldestOutstandingConfirm)
-                && oldestOutstandingConfirm.PublishedAt < republishThresholdTime)
-            || (oldestOutstandingConfirm == null && _tailSeqNo <= _lastPublishedSeqNo))
+        var timedOut = new List<PublisherConfirmMessage>();
+        using (await _tailSeqNoLock.LockAsync().ConfigureAwait(false))
         {
-            if (oldestOutstandingConfirm != null)
+            var republishThresholdTime = _dateTimeProvider.Now.AddMilliseconds(-_retryIntervalInMs);
+            while ((_outstandingConfirms.TryGetValue(_tailSeqNo, out var oldestOutstandingConfirm)
+                    && oldestOutstandingConfirm.PublishedAt < republishThresholdTime)
+                || (oldestOutstandingConfirm == null && _tailSeqNo <= _lastPublishedSeqNo))
             {
-                _outstandingConfirms.TryRemove(_tailSeqNo, out _);
-                PublishFailure.RecordNoConfirm(oldestOutstandingConfirm);
-                await PublishWithRetryCheckAsync(oldestOutstandingConfirm).ConfigureAwait(false);
-            }
+                if (oldestOutstandingConfirm != null)
+                {
+                    _outstandingConfirms.TryRemove(_tailSeqNo, out _);
+                    PublishFailure.RecordNoConfirm(oldestOutstandingConfirm);
+                    timedOut.Add(oldestOutstandingConfirm);
+                }
 
-            _tailSeqNo++;
+                _tailSeqNo++;
+            }
+        }
+
+        // Republished outside the lock: a publish may reset the bookkeeping, which takes it.
+        foreach (var message in timedOut)
+        {
+            await PublishWithRetryCheckAsync(message).ConfigureAwait(false);
         }
     }
 }

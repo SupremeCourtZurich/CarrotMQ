@@ -29,13 +29,14 @@ internal class CarrotChannel : ICarrotChannel
         Connection = connection;
         ProtocolSerializer = protocolSerializer;
         Logger = loggerFactory.CreateLogger<CarrotChannel>();
-        Connection.RecoverySucceededAsync += ConnectionRecoverySucceededAsync;
     }
 
     private TaskCompletionSource<bool> _reopened = CompletedSignal();
+    private bool _subscribedToRecovery;
 
     /// <summary>
-    /// Completes when the channel may be open again: CarrotMQ reopened it, or the client recovered the connection.
+    /// Completes when the channel may be open again: CarrotMQ reopened it, the client recovered the connection, or the
+    /// channel was disposed.
     /// Call under <see cref="ChannelLock" />, then check <see cref="IsOpen" /> again before waiting.
     /// </summary>
     protected Task NextReopenAsync()
@@ -46,28 +47,6 @@ internal class CarrotChannel : ICarrotChannel
         }
 
         return Volatile.Read(ref _reopened).Task;
-    }
-
-    /// <summary>
-    /// Waits for <paramref name="task" /> until <paramref name="token" /> is cancelled.
-    /// </summary>
-    /// <exception cref="OperationCanceledException">Thrown when <paramref name="token" /> is cancelled first.</exception>
-    protected static async Task WaitAsync(Task task, CancellationToken token)
-    {
-        if (token.CanBeCanceled)
-        {
-            var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            using (token.Register(() => cancelled.TrySetResult(true)))
-            {
-                await Task.WhenAny(task, cancelled.Task).ConfigureAwait(false);
-            }
-
-            token.ThrowIfCancellationRequested();
-        }
-        else
-        {
-            await task.ConfigureAwait(false);
-        }
     }
 
     private static TaskCompletionSource<bool> CompletedSignal()
@@ -138,6 +117,7 @@ internal class CarrotChannel : ICarrotChannel
         if (IsDisposed) throw new ObjectDisposedException(nameof(CarrotChannel));
         IsDisposed = true;
         Connection.RecoverySucceededAsync -= ConnectionRecoverySucceededAsync;
+        SignalReopened();
 
         await DisposeChannelAsync().ConfigureAwait(false);
         GC.SuppressFinalize(this);
@@ -293,6 +273,12 @@ internal class CarrotChannel : ICarrotChannel
         Channel.ChannelShutdownAsync += ChannelShutdownAsync;
         Channel.FlowControlAsync += ChannelOnFlowControlAsync;
         Channel.CallbackExceptionAsync += ChannelOnCallbackExceptionAsync;
+        if (!_subscribedToRecovery)
+        {
+            Connection.RecoverySucceededAsync += ConnectionRecoverySucceededAsync;
+            _subscribedToRecovery = true;
+        }
+
         SignalReopened();
 
         Logger.LogDebug("Channel {ChannelNumber} has been created", Channel?.ChannelNumber);

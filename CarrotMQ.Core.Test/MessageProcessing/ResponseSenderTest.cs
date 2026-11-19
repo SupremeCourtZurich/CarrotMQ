@@ -105,6 +105,26 @@ public class ResponseSenderTest
         Assert.AreEqual(1, _logger.LogMessages.Count(m => m == LogLevel.Warning));
     }
 
+    [TestMethod]
+    [DataRow(5_000, true)]
+    [DataRow(null, false)]
+    public async Task ResponseSender_SendIsBoundedByTheRequestsTtl(int? ttl, bool bounded)
+    {
+        // Arrange
+        CancellationToken sentWith = default;
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Do<CancellationToken>(t => sentWith = t)).Returns(Task.CompletedTask);
+        var header = new CarrotHeader { CorrelationId = Guid.NewGuid(), MessageProperties = new MessageProperties { Ttl = ttl } };
+        var middlewareContext = CreateTestMiddlewareContext(new CarrotMessage(header, "payload"));
+        middlewareContext.HandlerResult = new OkResult();
+        middlewareContext.ResponseRequired = true;
+
+        // Act
+        await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
+
+        // Assert
+        Assert.AreEqual(bounded, sentWith.CanBeCanceled);
+    }
+
     private MiddlewareContext CreateTestMiddlewareContext(CarrotMessage message)
     {
         return new MiddlewareContext(message, typeof(object), TestConsumerContext.GetConsumerContext(), CancellationToken.None);

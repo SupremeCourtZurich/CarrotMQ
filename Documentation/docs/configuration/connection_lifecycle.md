@@ -124,6 +124,8 @@ When the .NET host stops (e.g. `Ctrl+C`, `SIGTERM`, rolling deployment), the fol
 
 CarrotMQ waits for every in-flight handler to finish before closing channels. No acknowledged message is left mid-processing by the library itself.
 
+A publish that is still waiting when its channel is closed (for a confirm, for the channel to reopen, or on the recovery channel) fails with `ObjectDisposedException`. The broker may still have received the message.
+
 ### Hard deadline — host `ShutdownTimeout`
 
 CarrotMQ has no configurable drain timeout of its own. The only hard deadline is the .NET host's `ShutdownTimeout`, which defaults to **30 seconds**. If the drain takes longer than this, the host forcefully terminates the process.

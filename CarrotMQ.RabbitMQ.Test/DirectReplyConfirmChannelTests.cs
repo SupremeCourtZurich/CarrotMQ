@@ -64,6 +64,43 @@ public class DirectReplyConfirmChannelTests
         AssertLog("publish main", "publish main", "publish recovery", "ack recovery", "reply recovery", "publish recovery", "ack recovery");
     }
 
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RequestFailedToPublish_RetryWithTheSameCorrelationId_GetsItsReply()
+    {
+        // Arrange
+        var correlationId = Guid.NewGuid();
+        var failNextPublish = true;
+        _mainChannel.When(async c => await c.BasicPublishAsync(
+                    Arg.Any<string>(),
+                    Arg.Any<string>(),
+                    Arg.Any<bool>(),
+                    Arg.Any<BasicProperties>(),
+                    Arg.Any<ReadOnlyMemory<byte>>(),
+                    Arg.Any<CancellationToken>())
+                .ConfigureAwait(false))
+            .Do(_ =>
+            {
+                if (!failNextPublish) return;
+
+                failNextPublish = false;
+                throw new InvalidOperationException("publish failed");
+            });
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(
+                () => _sut.PublishWithReplyAsync(new CarrotMessage(new CarrotHeader { CorrelationId = correlationId }, "request"), CancellationToken.None))
+            .ConfigureAwait(false);
+
+        // Act
+        var retry = _sut.PublishWithReplyAsync(new CarrotMessage(new CarrotHeader { CorrelationId = correlationId }, "request"), CancellationToken.None);
+        await WaitForPublishesAsync(_mainChannel, 2).ConfigureAwait(false);
+        _mainChannel.BasicAcksAsync += Raise.Event<AckAsyncEventHandler>(_mainChannel, new BasicAckEventArgs(2, true));
+        await DeliverReplyAsync(_mainChannel, "main", correlationId).ConfigureAwait(false);
+
+        // Assert
+        var reply = await retry.ConfigureAwait(false);
+        Assert.AreEqual(correlationId, reply.Header.CorrelationId);
+    }
+
     // A channel that records its publishes and, if asked, acks each one before the publish returns.
     private IChannel CreateChannel(string name, bool ackEveryPublish)
     {
@@ -118,15 +155,20 @@ public class DirectReplyConfirmChannelTests
         _mainChannel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, Refusal);
     }
 
-    // Delivers through the consumer the recovery channel registered on amq.rabbitmq.reply-to.
-    private async Task DeliverReplyOnTheRecoveryChannelAsync(Guid correlationId)
+    private Task DeliverReplyOnTheRecoveryChannelAsync(Guid correlationId)
     {
-        var consumer = _recoveryChannel.ReceivedCalls()
+        return DeliverReplyAsync(_recoveryChannel, "recovery", correlationId);
+    }
+
+    // Delivers through the consumer the channel registered on amq.rabbitmq.reply-to.
+    private async Task DeliverReplyAsync(IChannel channel, string name, Guid correlationId)
+    {
+        var consumer = channel.ReceivedCalls()
             .SelectMany(c => c.GetArguments())
             .OfType<IAsyncBasicConsumer>()
             .Single();
 
-        Record("reply recovery");
+        Record($"reply {name}");
         await consumer.HandleBasicDeliverAsync(
                 "consumer",
                 1,

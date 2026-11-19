@@ -46,7 +46,7 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
                     if (IsOpen) continue;
                 }
 
-                await WaitAsync(reopened, token).ConfigureAwait(false);
+                await CancellableWait.WaitAsync(reopened, token).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
