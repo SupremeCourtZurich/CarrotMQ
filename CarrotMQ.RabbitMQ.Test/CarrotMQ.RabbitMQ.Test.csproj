@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0;net9.0;net8.0;net472</TargetFrameworks>
+        <TargetFrameworks>net11.0;net10.0;net9.0;net8.0;net472</TargetFrameworks>
         <LangVersion>14.0</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
@@ -12,11 +12,11 @@
 
     <ItemGroup>
         <PackageReference Include="RabbitMQ.Client" Version="7.2.2" />
-        <PackageReference Include="meziantou.analyzer" Version="3.0.147">
+        <PackageReference Include="meziantou.analyzer" Version="3.0.325">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="MSTest" Version="4.3.3" />
+        <PackageReference Include="MSTest" Version="4.5.3" />
         <PackageReference Include="NSubstitute" Version="6.2.0" />
     </ItemGroup>
 

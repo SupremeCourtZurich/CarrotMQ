@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0;net9.0;net8.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net11.0;net10.0;net9.0;net8.0;netstandard2.0</TargetFrameworks>
         <LangVersion>14.0</LangVersion>
         <Nullable>enable</Nullable>
 
@@ -32,21 +32,26 @@
         <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <DotNetLibrariesVersion>11.0.0</DotNetLibrariesVersion>
+    </PropertyGroup>
+
+    <!-- Microsoft.Extensions.* 11.x drops net8.0/net9.0, so those use 10.x. -->
+    <PropertyGroup Condition="'$(TargetFramework)' == 'net8.0' Or '$(TargetFramework)' == 'net9.0'">
+        <DotNetLibrariesVersion>10.0.15</DotNetLibrariesVersion>
+    </PropertyGroup>
+
     <ItemGroup>
-        <PackageReference Include="meziantou.analyzer" Version="3.0.147">
+        <PackageReference Include="meziantou.analyzer" Version="3.0.325">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.11" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400">
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="$(DotNetLibrariesVersion)" />
+        <PackageReference Include="MinVer" Version="8.0.0">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="MinVer" Version="7.0.0">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-        </PackageReference>
-        <PackageReference Include="System.Text.Json" Version="10.0.11" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+        <PackageReference Include="System.Text.Json" Version="$(DotNetLibrariesVersion)" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     </ItemGroup>
 
     <ItemGroup>
