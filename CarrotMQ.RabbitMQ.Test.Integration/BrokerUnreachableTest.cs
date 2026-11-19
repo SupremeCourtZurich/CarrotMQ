@@ -1,4 +1,4 @@
-using CarrotMQ.Core;
+﻿using CarrotMQ.Core;
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Test.Integration.Handlers;
 using CarrotMQ.RabbitMQ.Test.Integration.TestHelper;
@@ -18,17 +18,17 @@ public class BrokerUnreachableTest
 
     // Longer than Wait.UntilAsync waits, so only the TTL or the caller's token can end the publish in time.
     private static readonly TimeSpan OutlastsTheWait = TimeSpan.FromSeconds(25);
-    private CarrotHelper _producer = null!;
+    private CarrotHelper? _producer;
 
     [TestCleanup]
     public void Cleanup()
     {
-        _producer.Dispose();
+        _producer?.Dispose();
     }
 
     [TestMethod]
     [Timeout(30_000)]
-    public async Task NoConnection_EventTtlExpires_FailsAsUnreachable()
+    public async Task NoConnection_EventTtlExpires_IsCancelledAsUnreachable()
     {
         // Arrange
         var client = StartProducer(OutlastsTheWait);
@@ -37,12 +37,12 @@ public class BrokerUnreachableTest
         var publish = client.PublishAsync(new ExchangeEndPointEvent(1), messageProperties: WithTtl(500));
 
         // Assert
-        await AssertUnreachableAsync<OperationCanceledException>(publish).ConfigureAwait(false);
+        await AssertCancelledAsUnreachableAsync(publish).ConfigureAwait(false);
     }
 
     [TestMethod]
     [Timeout(30_000)]
-    public async Task NoConnection_QueryTtlExpires_FailsAsUnreachable()
+    public async Task NoConnection_QueryTtlExpires_IsCancelledAsUnreachable()
     {
         // Arrange
         var client = StartProducer(OutlastsTheWait);
@@ -51,12 +51,12 @@ public class BrokerUnreachableTest
         var query = client.SendReceiveAsync(new ExchangeEndPointQuery(1), messageProperties: WithTtl(500));
 
         // Assert
-        await AssertUnreachableAsync<OperationCanceledException>(query).ConfigureAwait(false);
+        await AssertCancelledAsUnreachableAsync(query).ConfigureAwait(false);
     }
 
     [TestMethod]
     [Timeout(30_000)]
-    public async Task NoConnection_CallerCancels_IsCancelled()
+    public async Task NoConnection_CallerCancels_IsCancelledAsUnreachable()
     {
         // Arrange
         var client = StartProducer(OutlastsTheWait);
@@ -67,8 +67,7 @@ public class BrokerUnreachableTest
         cts.Cancel();
 
         // Assert
-        await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes").ConfigureAwait(false);
-        await Assert.ThrowsAsync<OperationCanceledException>(() => publish).ConfigureAwait(false);
+        await AssertCancelledAsUnreachableAsync(publish).ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -90,20 +89,20 @@ public class BrokerUnreachableTest
         return MessageProperties.Default with { Ttl = ttl };
     }
 
-    private static async Task<PublishFailedException> AssertUnreachableAsync(Task publish)
+    private static async Task AssertUnreachableAsync(Task publish)
     {
         await Wait.UntilAsync(() => publish.IsCompleted, "the publish fails without a connection").ConfigureAwait(false);
         var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
         Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason, exception.Message);
-
-        return exception;
     }
 
-    private static async Task AssertUnreachableAsync<TInner>(Task publish)
-        where TInner : Exception
+    private static async Task AssertCancelledAsUnreachableAsync(Task publish)
     {
-        var exception = await AssertUnreachableAsync(publish).ConfigureAwait(false);
-        Assert.IsInstanceOfType<TInner>(exception.InnerException);
+        await Wait.UntilAsync(() => publish.IsCompleted, "the publish is cancelled without a connection").ConfigureAwait(false);
+        var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => publish).ConfigureAwait(false);
+        var failure = exception.InnerException as PublishFailedException;
+        Assert.IsNotNull(failure, exception.ToString());
+        Assert.AreEqual(PublishFailureReason.Unreachable, failure.Reason, failure.Message);
     }
 
     // The connect loop gives up after initialConnectionTimeout, so no attempt outlives the test.

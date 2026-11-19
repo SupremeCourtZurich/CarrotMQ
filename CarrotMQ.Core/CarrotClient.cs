@@ -17,6 +17,7 @@ namespace CarrotMQ.Core;
 /// </summary>
 public sealed class CarrotClient : ICarrotClient
 {
+    private const int DefaultRequestTtlInMs = 5_000;
     private readonly ICarrotMessageBuilder _messageBuilder;
     private readonly ICarrotSerializer _serializer;
     private readonly ITransport _transport;
@@ -142,27 +143,25 @@ public sealed class CarrotClient : ICarrotClient
         if (message.Header.MessageProperties.Ttl is null)
         {
             MessageProperties msgProps = message.Header.MessageProperties;
-            msgProps.Ttl = 5_000;
+            msgProps.Ttl = DefaultRequestTtlInMs;
             message.Header.MessageProperties = msgProps;
         }
 
         CarrotMessage responseMessage;
-        try
+
+        // Without a positive TTL the wait for the reply is still bounded by the default TTL.
+        var ttl = message.Header.MessageProperties.Ttl is > 0 ? message.Header.MessageProperties.Ttl.Value : DefaultRequestTtlInMs;
+        using (var ttlSource = CreateTtlSource(ttl, cancellationToken))
         {
-            if (message.Header.MessageProperties.Ttl > 0)
+            var token = ttlSource.Token;
+            try
             {
-                using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
-                responseMessage = await _transport.SendReceiveAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+                responseMessage = await _transport.SendReceiveAsync(message, token).ConfigureAwait(false);
             }
-            else
+            catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && token.IsCancellationRequested)
             {
-                responseMessage = await _transport.SendReceiveAsync(message, cancellationToken).ConfigureAwait(false);
+                throw Cancelled(ex, cancellationToken, token);
             }
-        }
-        catch (PublishFailedException ex) when (IsCancelledByCaller(ex, cancellationToken))
-        {
-            throw new OperationCanceledException(ex.Message, ex, cancellationToken);
         }
 
         CarrotResponse<TRequest, TResponse> response;
@@ -187,28 +186,29 @@ public sealed class CarrotClient : ICarrotClient
         CarrotMessage message,
         CancellationToken cancellationToken)
     {
+        using var ttlSource = message.Header.MessageProperties.Ttl is > 0 ? CreateTtlSource(message.Header.MessageProperties.Ttl.Value, cancellationToken) : null;
+        var token = ttlSource?.Token ?? cancellationToken;
         try
         {
-            if (message.Header.MessageProperties.Ttl > 0)
-            {
-                using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
-                await _transport.SendAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
-            }
-            else
-            {
-                await _transport.SendAsync(message, cancellationToken).ConfigureAwait(false);
-            }
+            await _transport.SendAsync(message, token).ConfigureAwait(false);
         }
-        catch (PublishFailedException ex) when (IsCancelledByCaller(ex, cancellationToken))
+        catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && token.IsCancellationRequested)
         {
-            throw new OperationCanceledException(ex.Message, ex, cancellationToken);
+            throw Cancelled(ex, cancellationToken, token);
         }
     }
 
-    // The transport cannot tell the caller's token from the TTL, so a cancelled publish fails the same for both.
-    private static bool IsCancelledByCaller(PublishFailedException exception, CancellationToken cancellationToken)
+    private static CancellationTokenSource CreateTtlSource(int ttlInMs, CancellationToken cancellationToken)
     {
-        return exception.InnerException is OperationCanceledException && cancellationToken.IsCancellationRequested;
+        var ttlSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        ttlSource.CancelAfter(ttlInMs);
+
+        return ttlSource;
+    }
+
+    // Caller cancellation and TTL expiry both end in OperationCanceledException; the inner exception carries the reason.
+    private static OperationCanceledException Cancelled(PublishFailedException exception, CancellationToken callerToken, CancellationToken token)
+    {
+        return new OperationCanceledException(exception.Message, exception, callerToken.IsCancellationRequested ? callerToken : token);
     }
 }

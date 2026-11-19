@@ -56,7 +56,16 @@ public sealed class ResponseSender : IResponseSender
         // Once the request's TTL has passed, nobody waits for its response any more.
         var ttl = responseMessage.Header.MessageProperties.Ttl;
         using var ttlSource = ttl > 0 ? new CancellationTokenSource(ttl.Value) : null;
-        await _transport.SendAsync(responseMessage, ttlSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+        try
+        {
+            await _transport.SendAsync(responseMessage, ttlSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && ttlSource is { IsCancellationRequested: true })
+        {
+            _logger.LogWarning(ex, "Response {CalledMethod} dropped: the request's TTL passed before it was published", requestMessage.Header.CalledMethod);
+
+            return;
+        }
 
         _logger.LogDebug(
             "Published response {CalledMethod}, StatusCode:{StatusCode}",

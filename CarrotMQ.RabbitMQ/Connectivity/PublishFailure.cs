@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using CarrotMQ.Core.Protocol;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -12,21 +12,11 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 internal static class PublishFailure
 {
     /// <summary>
-    /// The reason for a channel close, by protocol data only: initiator, reply code and the failed method.
+    /// The reason for a channel close: <see cref="PublishFailureReason.Unreachable" /> when the connection was lost,
+    /// otherwise <see cref="PublishFailureReason.Unknown" />.
     /// </summary>
     public static PublishFailureReason ReasonOf(ShutdownEventArgs close)
     {
-        if (PublishRecoveryChannel.IsPublishRefusal(close))
-        {
-            return close.ReplyCode switch
-            {
-                404 => PublishFailureReason.DestinationNotFound,
-                403 => PublishFailureReason.AccessRefused,
-                406 => PublishFailureReason.MessageRejected,
-                _ => PublishFailureReason.Unknown
-            };
-        }
-
         // 320 connection-forced and 541 internal-error close the connection, not just the channel.
         return close.Initiator == ShutdownInitiator.Library || close.ReplyCode is 320 or 541
             ? PublishFailureReason.Unreachable
@@ -35,14 +25,6 @@ internal static class PublishFailure
 
     public static void RecordClose(PublisherConfirmMessage message, ShutdownEventArgs close)
     {
-        // A refusal close belongs to the refused message, which only the recovery channel identifies.
-        if (PublishRecoveryChannel.IsPublishRefusal(close))
-        {
-            RecordNoConfirm(message);
-
-            return;
-        }
-
         message.LastFailureReason = ReasonOf(close);
         message.LastFailure = new AlreadyClosedException(close);
     }
@@ -51,16 +33,6 @@ internal static class PublishFailure
     {
         message.LastFailureReason = PublishFailureReason.Unknown;
         message.LastFailure = null;
-    }
-
-    public static RetryLimitExceededException Refused(PublisherConfirmMessage message, ShutdownEventArgs close)
-    {
-        var header = message.MessageHeader;
-
-        return new RetryLimitExceededException(
-            $"Publish to exchange '{header.Exchange}' with routing key '{header.RoutingKey}' was refused by the broker: {close.ReplyCode} {close.ReplyText}",
-            ReasonOf(close),
-            new AlreadyClosedException(close));
     }
 
     /// <summary>
@@ -74,14 +46,19 @@ internal static class PublishFailure
 
     /// <summary>
     /// The reason for a publish whose token fired on a channel: <see cref="PublishFailureReason.Unreachable" /> while the
-    /// connection is down or missing, or while the channel is closed and no other cause is known; otherwise
-    /// <paramref name="lastFailure" />.
+    /// connection is down or missing, or while the channel is closed by a lost connection or for an unknown cause;
+    /// otherwise <paramref name="lastFailure" />.
     /// </summary>
-    public static PublishFailureReason ReasonAtCancellation(IConnection? connection, bool channelOpen, PublishFailureReason lastFailure)
+    public static PublishFailureReason ReasonAtCancellation(
+        IConnection? connection,
+        bool channelOpen,
+        ShutdownEventArgs? lastClose,
+        PublishFailureReason lastFailure)
     {
         var reason = ReasonAtCancellation(connection, lastFailure);
+        if (channelOpen || reason != PublishFailureReason.Unknown) return reason;
 
-        return !channelOpen && reason == PublishFailureReason.Unknown ? PublishFailureReason.Unreachable : reason;
+        return lastClose == null ? PublishFailureReason.Unreachable : ReasonOf(lastClose);
     }
 
     public static PublishFailedException Cancelled(CarrotHeader header, PublishFailureReason reason, OperationCanceledException cancellation)
@@ -93,12 +70,11 @@ internal static class PublishFailure
     }
 
     /// <summary>
-    /// A publish without confirm on a closed channel; a refusal close belongs to another message.
+    /// A publish without confirm on a channel the broker closed while it was sent.
     /// </summary>
     public static PublishFailedException Closed(CarrotHeader header, IConnection connection, AlreadyClosedException cause)
     {
-        var close = cause.ShutdownReason;
-        var lastFailure = close == null || PublishRecoveryChannel.IsPublishRefusal(close) ? PublishFailureReason.Unknown : ReasonOf(close);
+        var lastFailure = cause.ShutdownReason == null ? PublishFailureReason.Unknown : ReasonOf(cause.ShutdownReason);
         var reason = ReasonAtCancellation(connection, lastFailure);
 
         return new PublishFailedException(

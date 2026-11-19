@@ -3,8 +3,9 @@
 namespace CarrotMQ.Core.Protocol;
 
 /// <summary>
-/// Represents an exception thrown when a message sent with publisher confirm was not confirmed by the broker: the retry
-/// limit was exceeded, or the broker refused the message. <see cref="PublishFailedException.Reason" /> tells which.
+/// Represents an exception thrown when the retry limit for a message sent with publisher confirm is exceeded.
+/// No ack has been received from the broker to confirm the arrival of this message;
+/// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable during the last attempt.
 /// </summary>
 public sealed class RetryLimitExceededException : PublishFailedException
 {

@@ -47,7 +47,7 @@ public class PublishFailedException : Exception
     }
 
     /// <summary>
-    /// Why the publish was not confirmed.
+    /// Why the publish was not confirmed; <see cref="PublishFailureReason.Unknown" /> unless a constructor sets it.
     /// </summary>
-    public PublishFailureReason Reason { get; }
+    public PublishFailureReason Reason { get; } = PublishFailureReason.Unknown;
 }

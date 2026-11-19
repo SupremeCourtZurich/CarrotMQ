@@ -18,8 +18,6 @@ Publisher confirm behaviour is controlled through `PublisherConfirmOptions`, nes
 | `RetryLimit` | 100 | How many times to retry publishing a message if no positive ack is received from the broker. |
 | `RetryIntervalInMs` | 1000 | Milliseconds to wait between retry attempts. |
 | `RepublishEvaluationIntervalInMs` | 100 | How often (in milliseconds) CarrotMQ checks internally for messages that need to be retried. |
-| `IsolateRefusedPublishes` | false | If true, a [refused publish](#refused-publishes) fails at once with its reason, and the other unconfirmed messages are republished on a separate channel. |
-| `RecoveryChannelIdleTimeoutInMs` | 60000 | With `IsolateRefusedPublishes`: milliseconds without work after which the channel used for [refused publishes](#refused-publishes) is closed; also the longest wait there for a request's reply before the next message is published. |
 
 ---
 
@@ -70,26 +68,30 @@ await carrotClient.PublishAsync(
 
 ## RetryLimitExceededException
 
-`RetryLimitExceededException` is thrown when a message sent with publisher confirms enabled cannot be positively acknowledged by the broker: after `RetryLimit` attempts, or at once when the broker refuses the message.
+`RetryLimitExceededException` is thrown when a message sent with publisher confirms enabled cannot be positively acknowledged by the broker after `RetryLimit` attempts.
 
 ### When It Is Thrown
 
+The exception occurs in the following sequence:
+
 1. A message is published with `MessageProperties.PublisherConfirm = true` (the default).
-2. With `IsolateRefusedPublishes`, the broker refuses the publish (see [Refused Publishes](#refused-publishes)): the exception is raised to the caller at once.
-3. Otherwise, the broker sends a NACK (negative acknowledgement) or the confirmation times out: CarrotMQ republishes the message and increments an internal retry counter.
+2. The broker sends a NACK (negative acknowledgement) or the confirmation times out.
+3. CarrotMQ enqueues the message for republishing and increments an internal retry counter.
 4. Once the counter exceeds `PublisherConfirmOptions.RetryLimit`, the exception is raised to the caller.
+
+> [!NOTE]
+> When `RetryLimitExceededException` is thrown, the message **may or may not** have been delivered — the exception only means that delivery could not be **confirmed**. If delivery guarantees are critical, implement an outbox pattern or idempotency in the consumer.
 
 ### Why It Failed
 
-`RetryLimitExceededException` derives from `PublishFailedException` (CarrotMQ.Core). Its `Reason` tells the cause; the broker's reply code and text are in the message, the RabbitMQ exception is the `InnerException`.
+`RetryLimitExceededException` derives from `PublishFailedException` (CarrotMQ.Core). Its `Reason` tells the cause of the last attempt; the RabbitMQ exception, if any, is the `InnerException`.
 
 | `Reason` | Meaning | Typical reaction |
 |---|---|---|
-| `DestinationNotFound` | The exchange does not exist (404). Only with `IsolateRefusedPublishes`. | This message's own problem. |
-| `AccessRefused` | Publishing to the exchange is not allowed, e.g. an internal exchange (403). Only with `IsolateRefusedPublishes`. | This message's own problem. |
-| `MessageRejected` | The broker refused the message itself (406). Only with `IsolateRefusedPublishes`. | This message's own problem. |
 | `Unreachable` | The connection to the broker was lost on the last attempt. | Back off and retry later. |
 | `Unknown` | No confirm or a NACK, without a known cause. | Retry later. |
+
+When the broker refuses a publish, for example because the exchange does not exist (404), it closes the channel. CarrotMQ reopens it and republishes all unconfirmed messages, so the refused message fails with `Reason = Unknown` after `RetryLimit` retries. Declare exchanges before publishing to them.
 
 ### While the Broker Is Unreachable
 
@@ -97,49 +99,37 @@ A publish waits for the connection to recover, whether or not the process has co
 
 | When | Exception | `Reason` |
 |---|---|---|
-| The message's TTL expires | `PublishFailedException` | `Unreachable` while the connection is down or the channel is still being reopened, otherwise the cause of the last attempt (usually `Unknown`) |
+| The message's TTL expires | `OperationCanceledException` | The `InnerException` is a `PublishFailedException`: `Unreachable` while the connection is down or the channel is still being reopened after a lost connection, otherwise the cause of the last attempt (usually `Unknown`) |
 | `InitialConnectionTimeout` passes before the first connection | `PublishFailedException` | `Unreachable` |
-| The caller's `CancellationToken` is cancelled | `OperationCanceledException` | The `InnerException` is the `PublishFailedException` with the reason |
+| The caller's `CancellationToken` is cancelled | `OperationCanceledException` | Same as for the TTL |
 
-Events have no TTL by default: without a TTL or a `CancellationToken`, a publish waits until the broker is back. A request whose publish was confirmed but whose reply did not arrive within the TTL ends with `OperationCanceledException`.
+Events have no TTL by default: without a TTL or a `CancellationToken`, a publish waits until the broker is back. A request waits for its reply at most for its TTL, or 5 seconds when it has no positive TTL; a reply that does not arrive in time also ends with `OperationCanceledException`, without an inner `PublishFailedException`.
 
-> [!NOTE]
-> When `RetryLimitExceededException` is thrown, the message **may or may not** have been delivered — the exception only means that delivery could not be **confirmed**. If delivery guarantees are critical, implement an outbox pattern or idempotency in the consumer.
-
-Handle this exception in publishing code to implement application-level fallback logic:
+Handle these exceptions in publishing code to implement application-level fallback logic:
 
 ```csharp
 try
 {
     await carrotClient.PublishAsync(myEvent, messageProperties: MessageProperties.Default with { Ttl = 10_000 });
 }
-catch (PublishFailedException ex) when (ex.Reason is PublishFailureReason.DestinationNotFound
-                                            or PublishFailureReason.AccessRefused
-                                            or PublishFailureReason.MessageRejected)
+catch (OperationCanceledException ex) when (ex.InnerException is PublishFailedException { Reason: PublishFailureReason.Unreachable })
 {
-    logger.LogError(ex, "The broker refused {Event}", myEvent);
-    // Mark the message as failed, raise an alert, etc.
+    // The TTL expired while the broker was unreachable: keep the message in the outbox and back off.
 }
-catch (PublishFailedException)
+catch (PublishFailedException ex) when (ex.Reason == PublishFailureReason.Unreachable)
 {
-    // Broker unreachable or no confirm: keep the message and retry later.
+    // No connection within InitialConnectionTimeout, or the retries ran out on a lost connection: back off.
+}
+catch (Exception ex) when (ex is OperationCanceledException or PublishFailedException)
+{
+    logger.LogError(ex, "Failed to publish {Event}", myEvent);
+    // No confirm: keep the message and retry later, raise an alert, etc.
 }
 ```
 
 ### When Publisher Confirms Are Disabled
 
-If you disable publisher confirms via `MessageProperties { PublisherConfirm = false }`, `RetryLimitExceededException` is never thrown for that message. The broker does not acknowledge the send, and CarrotMQ returns immediately after dispatching.
-
----
-
-## Refused Publishes
-
-When the broker refuses a publish, for example because the exchange does not exist (404), it closes the channel and discards every message published after it.
-
-- **`IsolateRefusedPublishes = false` (default):** CarrotMQ reopens the channel and republishes all unconfirmed messages, the refused one included. Each attempt of the refused message closes the channel again and discards the messages published after it, so they are retried with it and can also fail with `RetryLimitExceededException` (`Reason = Unknown`) once they exceed `RetryLimit`. The refused message fails with `RetryLimitExceededException` and `Reason = Unknown` after `RetryLimit` retries. An exchange declared in the meantime lets it through.
-- **`IsolateRefusedPublishes = true`:** CarrotMQ republishes the unconfirmed messages one at a time on a separate channel. The refused message fails at once with `RetryLimitExceededException` and the matching `Reason`; it is not retried, so an exchange declared later does not let it through. The other messages are confirmed as usual. After a request is confirmed there, the next message waits for its reply, at most until the request times out or `RecoveryChannelIdleTimeoutInMs` passes.
-
-Either way, declare exchanges before publishing to them.
+If you disable publisher confirms via `MessageProperties { PublisherConfirm = false }`, `RetryLimitExceededException` is never thrown for that message. The broker does not acknowledge the send, and CarrotMQ returns once the message is sent. While the channel is closed, the publish waits for it to reopen, until the TTL or the `CancellationToken` ends the wait with the exceptions above.
 
 ---
 

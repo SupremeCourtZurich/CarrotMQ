@@ -33,6 +33,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="autoDelete">If true, the queue will be auto deleted.</param>
     /// <param name="arguments">Additional arguments (null = none).</param>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task DeclareQueueAsync(string queueName, bool durable, bool exclusive, bool autoDelete, IDictionary<string, object?>? arguments = null);
 
     /// <summary>
@@ -45,6 +46,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// </summary>
     /// <param name="queueName">The name of the queue.</param>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task DeleteQueueAsync(string queueName);
 
     /// <summary>
@@ -59,6 +61,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="autoDelete">If true, the exchange will be auto deleted one it is unused (no open channels, bindings).</param>
     /// <param name="arguments">Additional arguments (null = none).</param>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task DeclareExchangeAsync(
         string exchangeName,
         string exchangeType,
@@ -69,6 +72,8 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <summary>
     /// Creates all exchanges with the given list.
     /// </summary>
+    /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task DeclareExchangesAsync(ExchangeCollection exchangeCollection);
 
     /// <summary>
@@ -77,6 +82,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="exchangeName">Name of the exchange to delete</param>
     /// <param name="ifUnused">Delete only if unused</param>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task DeleteExchangeAsync(string exchangeName, bool ifUnused = false);
 
     /// <summary>
@@ -87,6 +93,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="routingKey">The routing key.</param>
     /// <param name="arguments">Additional AMQP arguments.</param>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task BindQueueAsync(string queueName, string exchange, string routingKey, IDictionary<string, object?>? arguments = null);
 
     /// <summary>
@@ -95,6 +102,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="queueName">The name of the queue.</param>
     /// <returns>True, if the queue exists on the broker, otherwise false.</returns>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task<bool> CheckQueueAsync(string queueName);
 
     /// <summary>
@@ -103,6 +111,7 @@ public interface ICarrotChannel : IAsyncDisposable
     /// <param name="exchangeName">The name of the exchange.</param>
     /// <returns>True, if the exchange exists on the broker, otherwise false.</returns>
     /// <exception cref="OperationInterruptedException"></exception>
+    /// <exception cref="ObjectDisposedException">The channel was disposed while it waited to be reopened.</exception>
     Task<bool> CheckExchangeAsync(string exchangeName);
 
     /// <summary>

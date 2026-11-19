@@ -19,13 +19,15 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 /// <inheritdoc />
 internal class CarrotChannel : ICarrotChannel
 {
+    private readonly TimeSpan _networkRecoveryInterval;
+
     protected CarrotChannel(
         IConnection connection,
         TimeSpan networkRecoveryInterval,
         IProtocolSerializer protocolSerializer,
         ILoggerFactory loggerFactory)
     {
-        NetworkRecoveryInterval = networkRecoveryInterval;
+        _networkRecoveryInterval = networkRecoveryInterval;
         Connection = connection;
         ProtocolSerializer = protocolSerializer;
         Logger = loggerFactory.CreateLogger<CarrotChannel>();
@@ -33,6 +35,7 @@ internal class CarrotChannel : ICarrotChannel
 
     private TaskCompletionSource<bool> _reopened = CompletedSignal();
     private bool _subscribedToRecovery;
+    private int _recoveryRunning;
 
     /// <summary>
     /// Completes when the channel may be open again: CarrotMQ reopened it, the client recovered the connection, or the
@@ -75,8 +78,6 @@ internal class CarrotChannel : ICarrotChannel
 
     protected ILogger Logger { get; }
 
-    protected TimeSpan NetworkRecoveryInterval { get; }
-
     /// <summary>
     /// The reason of the last shutdown of <see cref="Channel" />, or <c>null</c> before the first one.
     /// </summary>
@@ -106,6 +107,31 @@ internal class CarrotChannel : ICarrotChannel
     protected void OnTransportErrorReceived(TransportErrorReceivedEventArgs e)
     {
         TransportErrorReceived?.Invoke(this, e);
+    }
+
+    /// <summary>
+    /// Acquires <see cref="ChannelLock" /> once the channel is open, waiting for a reopen while it is closed.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The channel was disposed before it was open again.</exception>
+    protected async Task<IDisposable> LockOpenChannelAsync(CancellationToken token = default)
+    {
+        while (true)
+        {
+            var scope = await ChannelLock.LockAsync(token).ConfigureAwait(false);
+            if (IsDisposed)
+            {
+                scope.Dispose();
+                throw new ObjectDisposedException(nameof(CarrotChannel));
+            }
+
+            if (IsOpen) return scope;
+
+            var reopened = NextReopenAsync();
+            if (IsOpen) return scope;
+
+            scope.Dispose();
+            await CancellableWait.WaitAsync(reopened, token).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -138,7 +164,7 @@ internal class CarrotChannel : ICarrotChannel
             exclusive,
             autoDelete);
 
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
 
         var declareOk = await Channel!.QueueDeclareAsync(queueName, durable, exclusive, autoDelete, arguments).ConfigureAwait(false);
 
@@ -165,7 +191,7 @@ internal class CarrotChannel : ICarrotChannel
     {
         Logger.LogInformation("Delete queue {QueueName}", queueName);
 
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
         await Channel!.QueueDeleteAsync(queueName).ConfigureAwait(false);
     }
 
@@ -179,7 +205,7 @@ internal class CarrotChannel : ICarrotChannel
     {
         Logger.LogInformation("Declaring exchange {ExchangeName}", exchangeName);
 
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
         await Channel!.ExchangeDeclareAsync(exchangeName, exchangeType, durable, autoDelete, arguments).ConfigureAwait(false);
     }
 
@@ -196,7 +222,7 @@ internal class CarrotChannel : ICarrotChannel
     {
         Logger.LogInformation("Delete exchange {ExchangeName}", exchangeName);
 
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
         await Channel!.ExchangeDeleteAsync(exchangeName, ifUnused).ConfigureAwait(false);
     }
 
@@ -213,7 +239,7 @@ internal class CarrotChannel : ICarrotChannel
             queueName,
             routingKey);
 
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+        using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
         await Channel!.QueueBindAsync(queueName, exchange, routingKey, arguments).ConfigureAwait(false);
     }
 
@@ -335,22 +361,38 @@ internal class CarrotChannel : ICarrotChannel
         //     Declaring an existing queue/exchange with non-matching properties
 
 #pragma warning disable MA0134
+        if (Interlocked.CompareExchange(ref _recoveryRunning, 1, 0) != 0) return Task.CompletedTask;
+
         Task.Run(async () =>
         {
-            using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
-
-            while (IsClosed)
+            // The lock is released between attempts, so dispose and waiting publishes are not blocked by an outage.
+            while (true)
             {
-                try
+                using (await ChannelLock.LockAsync().ConfigureAwait(false))
                 {
-                    await EnsureOrRecoverChannelAsync().ConfigureAwait(false);
+                    if (IsDisposed || !IsClosed)
+                    {
+                        Volatile.Write(ref _recoveryRunning, 0);
+
+                        // A close between the check and the reset started no loop: this one takes it over.
+                        if (IsDisposed || !IsClosed || Interlocked.CompareExchange(ref _recoveryRunning, 1, 0) != 0) return;
+
+                        continue;
+                    }
+
+                    try
+                    {
+                        await EnsureOrRecoverChannelAsync().ConfigureAwait(false);
+
+                        continue;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "AMQP channel recovery failed -> retry");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Logger.LogWarning(ex, "AMQP channel recovery failed -> retry");
-                    await Task.Delay(NetworkRecoveryInterval)
-                        .ConfigureAwait(false); // Avoid floading RabbitMQ when something is wrong
-                }
+
+                await Task.Delay(_networkRecoveryInterval).ConfigureAwait(false); // Avoid floading RabbitMQ when something is wrong
             }
         });
 #pragma warning restore MA0134
@@ -377,7 +419,7 @@ internal class CarrotChannel : ICarrotChannel
         var entityExists = false;
         try
         {
-            using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+            using var scope = await LockOpenChannelAsync().ConfigureAwait(false);
             await checkEntity().ConfigureAwait(false);
 
             entityExists = true;

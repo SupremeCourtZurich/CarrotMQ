@@ -20,19 +20,15 @@ namespace CarrotMQ.RabbitMQ.Connectivity;
 internal class PublisherConfirmChannel : PublisherChannel
 {
     private readonly IDateTimeProvider _dateTimeProvider;
-    private readonly bool _isolateRefusedPublishes;
+    private readonly CancellationTokenSource _disposeCts = new();
     private readonly uint _maxRetries;
     private readonly ConcurrentDictionary<ulong, PublisherConfirmMessage> _outstandingConfirms = new();
     private readonly SemaphoreSlim _outstandingConfirmsCount;
     private readonly ConcurrentQueue<PublisherConfirmMessage> _publishedOnClosedChannel = new();
     private readonly ConcurrentQueue<PublisherConfirmMessage> _republishQueue = new();
-    private readonly uint _recoveryChannelIdleTimeoutInMs;
     private readonly uint _retryIntervalInMs;
     private readonly AsyncLock _tailSeqNoLock = new();
-    private readonly CancellationTokenSource _disposeCts = new();
     private readonly IIntervalTimer _timer;
-    private PublishRecoveryChannel? _recoveryChannel;
-    private bool _recoveryChannelDisposed;
 
     /// <summary>
     /// Sequence number of the latest published message
@@ -61,8 +57,6 @@ internal class PublisherConfirmChannel : PublisherChannel
         _outstandingConfirmsCount = new SemaphoreSlim(options.MaxConcurrentConfirms);
         _retryIntervalInMs = options.RetryIntervalInMs;
         _maxRetries = options.RetryLimit;
-        _recoveryChannelIdleTimeoutInMs = options.RecoveryChannelIdleTimeoutInMs;
-        _isolateRefusedPublishes = options.IsolateRefusedPublishes;
     }
 
     /// <summary>
@@ -120,15 +114,39 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <exception cref="Exception">Thrown when an error occurs during the publish operation.</exception>
     public override async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
-        try
+        using (var slotWait = CancellationTokenSource.CreateLinkedTokenSource(token, _disposeCts.Token))
         {
-            await _outstandingConfirmsCount.WaitAsync(token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
-        {
-            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex);
+            try
+            {
+                await _outstandingConfirmsCount.WaitAsync(slotWait.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+            {
+                throw PublishFailure.Cancelled(message.Header, ReasonAtCancellation(PublishFailureReason.Unknown), ex);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new ObjectDisposedException(nameof(PublisherConfirmChannel));
+            }
         }
 
+        try
+        {
+            await PublishAndWaitForConfirmAsync(message, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            _outstandingConfirmsCount.Release();
+        }
+    }
+
+    private PublishFailureReason ReasonAtCancellation(PublishFailureReason lastFailure)
+    {
+        return PublishFailure.ReasonAtCancellation(Connection, IsOpen, LastShutdownReason, lastFailure);
+    }
+
+    private async Task PublishAndWaitForConfirmAsync(CarrotMessage message, CancellationToken token)
+    {
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var basicProperties = CreateBasicProperties(message.Header);
         string payload = ProtocolSerializer.Serialize(message, basicProperties);
@@ -157,13 +175,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
         {
-            var reason = PublishFailure.ReasonAtCancellation(Connection, IsOpen, confirmMessage.LastFailureReason);
-
-            throw PublishFailure.Cancelled(message.Header, reason, ex);
-        }
-        finally
-        {
-            _outstandingConfirmsCount.Release();
+            throw PublishFailure.Cancelled(message.Header, ReasonAtCancellation(confirmMessage.LastFailureReason), ex);
         }
     }
 
@@ -183,7 +195,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         var seqNo = await Channel!.GetNextPublishSequenceNumberAsync(confirmMessage.CancellationToken).ConfigureAwait(false);
 
         // The client restarts sequence numbers on a channel it recovered by itself.
-        if (seqNo <= _lastPublishedSeqNo) await FlagAllMessagesForRepublishAsync(false).ConfigureAwait(false);
+        if (seqNo <= _lastPublishedSeqNo) await FlagAllMessagesForRepublishAsync().ConfigureAwait(false);
 
         confirmMessage.PublishedAt = _dateTimeProvider.Now;
         confirmMessage.SeqNo = seqNo;
@@ -228,30 +240,13 @@ internal class PublisherConfirmChannel : PublisherChannel
 
     protected override async Task CreateChannelAsync()
     {
-        var closedByRefusal = _isolateRefusedPublishes && PublishRecoveryChannel.IsPublishRefusal(LastShutdownReason);
         await base.CreateChannelAsync().ConfigureAwait(false);
 
         Channel!.BasicAcksAsync += BasicAcksAsync;
         Channel!.BasicNacksAsync += BasicNacksAsync;
         Channel!.BasicReturnAsync += BasicReturnAsync;
 
-        await FlagAllMessagesForRepublishAsync(closedByRefusal).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Called after the recovery channel was opened, before anything is published on it.
-    /// </summary>
-    protected virtual Task OnRecoveryChannelCreatedAsync(IChannel channel)
-    {
-        return Task.CompletedTask;
-    }
-
-    /// <summary>
-    /// Completes when the reply to a request confirmed on a recovery channel has arrived or is no longer awaited.
-    /// </summary>
-    protected virtual Task WaitForReplyAsync(CarrotHeader header)
-    {
-        return Task.CompletedTask;
+        await FlagAllMessagesForRepublishAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -259,18 +254,10 @@ internal class PublisherConfirmChannel : PublisherChannel
     {
         _timer.Dispose();
 
-        // Fails every publish still waiting for its confirm, its reopen or the recovery channel.
+        // Fails every publish still waiting for a slot, its confirm or the channel to reopen.
+        // The slot semaphore stays undisposed: publishes completing after this still release their slot.
         _disposeCts.Cancel();
 
-        PublishRecoveryChannel? recoveryChannel;
-        using (await _tailSeqNoLock.LockAsync().ConfigureAwait(false))
-        {
-            _recoveryChannelDisposed = true;
-            recoveryChannel = _recoveryChannel;
-        }
-
-        if (recoveryChannel != null) await recoveryChannel.DisposeAsync().ConfigureAwait(false);
-        _outstandingConfirmsCount.Dispose();
         await base.DisposeAsync().ConfigureAwait(false);
         _disposeCts.Dispose();
     }
@@ -354,11 +341,11 @@ internal class PublisherConfirmChannel : PublisherChannel
     }
 
     /// <summary>
-    /// Move all messages from <see cref="_outstandingConfirms" /> to <see cref="_republishQueue" />, or to the recovery
-    /// channel when the broker closed the channel over a refused publish.
+    /// Move all messages from <see cref="_outstandingConfirms" /> and <see cref="_publishedOnClosedChannel" /> to
+    /// <see cref="_republishQueue" />.
     /// This happens after a channel shutdown --> all messages have to be republished with a new sequence number
     /// </summary>
-    private async Task FlagAllMessagesForRepublishAsync(bool toRecoveryChannel)
+    private async Task FlagAllMessagesForRepublishAsync()
     {
         using var scope = await _tailSeqNoLock.LockAsync().ConfigureAwait(false);
         var oldTailSeqNo = _tailSeqNo;
@@ -377,42 +364,20 @@ internal class PublisherConfirmChannel : PublisherChannel
 
         void Republish(PublisherConfirmMessage message)
         {
-            if (toRecoveryChannel && !_recoveryChannelDisposed)
-            {
-                GetRecoveryChannel().Enqueue(message);
-            }
-            else
-            {
-                if (LastShutdownReason != null) PublishFailure.RecordClose(message, LastShutdownReason);
-                _republishQueue.Enqueue(message);
-            }
+            if (LastShutdownReason != null) PublishFailure.RecordClose(message, LastShutdownReason);
+            _republishQueue.Enqueue(message);
         }
-    }
-
-    // Called under _tailSeqNoLock only.
-    private PublishRecoveryChannel GetRecoveryChannel()
-    {
-        return _recoveryChannel ??= new PublishRecoveryChannel(
-            Connection,
-            CreateChannelOptions(),
-            _maxRetries,
-            ToDelay(_retryIntervalInMs),
-            NetworkRecoveryInterval,
-            ToDelay(_recoveryChannelIdleTimeoutInMs),
-            OnRecoveryChannelCreatedAsync,
-            WaitForReplyAsync,
-            Logger);
-    }
-
-    // Task.Delay and SemaphoreSlim.WaitAsync accept 1 ms to int.MaxValue ms.
-    private static TimeSpan ToDelay(uint milliseconds)
-    {
-        return TimeSpan.FromMilliseconds(Math.Min(Math.Max(milliseconds, 1u), int.MaxValue));
     }
 
     private async Task RepublishOnTimedEventAsync()
     {
         using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
+
+        // Messages whose publisher has given up are dropped while the channel stays closed.
+        for (var n = _publishedOnClosedChannel.Count; n > 0 && _publishedOnClosedChannel.TryDequeue(out var queued); n--)
+        {
+            if (!queued.CancellationToken.IsCancellationRequested) _publishedOnClosedChannel.Enqueue(queued);
+        }
 
         // A channel that recovered by itself is not reopened here, so its unsent messages are not handed over.
         if (Channel is { IsOpen: true })

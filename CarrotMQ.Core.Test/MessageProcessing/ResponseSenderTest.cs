@@ -106,14 +106,13 @@ public class ResponseSenderTest
     }
 
     [TestMethod]
-    [DataRow(5_000, true)]
-    [DataRow(null, false)]
-    public async Task ResponseSender_SendIsBoundedByTheRequestsTtl(int? ttl, bool bounded)
+    [Timeout(5_000)]
+    public async Task ResponseSender_TtlPassesWhilePublishing_DropsTheResponseWithAWarning()
     {
         // Arrange
-        CancellationToken sentWith = default;
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Do<CancellationToken>(t => sentWith = t)).Returns(Task.CompletedTask);
-        var header = new CarrotHeader { CorrelationId = Guid.NewGuid(), MessageProperties = new MessageProperties { Ttl = ttl } };
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => FailWhenCancelledAsync(ci.Arg<CancellationToken>()));
+        var header = new CarrotHeader { CorrelationId = Guid.NewGuid(), MessageProperties = new MessageProperties { Ttl = 50 } };
         var middlewareContext = CreateTestMiddlewareContext(new CarrotMessage(header, "payload"));
         middlewareContext.HandlerResult = new OkResult();
         middlewareContext.ResponseRequired = true;
@@ -122,14 +121,50 @@ public class ResponseSenderTest
         await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
 
         // Assert
-        Assert.AreEqual(bounded, sentWith.CanBeCanceled);
+        Assert.AreEqual(1, _logger.LogMessages.Count(m => m == LogLevel.Warning));
+    }
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ResponseSender_RetryLimitExceededAsTheTtlPasses_Propagates()
+    {
+        // Arrange
+        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
+            .Returns(ci => RetryLimitExceededWhenCancelledAsync(ci.Arg<CancellationToken>()));
+        var header = new CarrotHeader { CorrelationId = Guid.NewGuid(), MessageProperties = new MessageProperties { Ttl = 50 } };
+        var middlewareContext = CreateTestMiddlewareContext(new CarrotMessage(header, "payload"));
+        middlewareContext.HandlerResult = new OkResult();
+        middlewareContext.ResponseRequired = true;
+
+        // Act
+        var send = _responseSender.TrySendResponseAsync(middlewareContext);
+
+        // Assert
+        await Assert.ThrowsExactlyAsync<RetryLimitExceededException>(() => send).ConfigureAwait(false);
     }
 
+    private static async Task RetryLimitExceededWhenCancelledAsync(CancellationToken token)
+    {
+        await Task.Delay(Timeout.Infinite, token).ContinueWith(_ => { }, TaskScheduler.Default).ConfigureAwait(false);
+
+        throw new RetryLimitExceededException("no confirm", PublishFailureReason.Unknown);
+    }
     private MiddlewareContext CreateTestMiddlewareContext(CarrotMessage message)
     {
         return new MiddlewareContext(message, typeof(object), TestConsumerContext.GetConsumerContext(), CancellationToken.None);
     }
 
+    // Like a transport waiting for an unreachable broker: it gives up only when its token fires.
+    private static async Task FailWhenCancelledAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new PublishFailedException("cancelled", PublishFailureReason.Unreachable, ex);
+        }
+    }
     public class ResponseSenderLogger : ILogger<ResponseSender>
     {
         public IList<LogLevel> LogMessages { get; } = [];
