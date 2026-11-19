@@ -2,10 +2,15 @@
 using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Connectivity;
 using CarrotMQ.RabbitMQ.Serialization;
+using CarrotMQ.RabbitMQ.Test.Helper;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using IChannel = RabbitMQ.Client.IChannel;
+using ShutdownAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.ShutdownEventArgs>;
 
 namespace CarrotMQ.RabbitMQ.Test;
 
@@ -14,11 +19,14 @@ public class PublisherChannelTests
 {
     private BasicProperties _basicProperties = null!;
     private IPublisherChannel _channel = null!;
+    private IConnection _connection = null!;
+    private IChannel _rabbitChannel = null!;
 
     [TestInitialize]
     public async Task Initialize()
     {
         var channel = Substitute.For<IChannel>();
+        _rabbitChannel = channel;
         channel.IsOpen.Returns(true);
 
         channel.When(m => m.BasicPublishAsync(
@@ -31,6 +39,8 @@ public class PublisherChannelTests
             .Do(a => { _basicProperties = a.Arg<BasicProperties>(); });
 
         var connection = Substitute.For<IConnection>();
+        _connection = connection;
+        connection.IsOpen.Returns(true);
         connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>())
             .Returns(_ => Task.FromResult(channel));
 
@@ -47,6 +57,328 @@ public class PublisherChannelTests
                 loggerFactory)
             .ConfigureAwait(false);
     }
+
+    // The 1 h recovery interval rules out a second attempt by the one allowed loop, so the short wait cannot fail falsely.
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task ChannelClosedAgainWhileRecovering_OnlyOneRecoveryLoopRuns()
+    {
+        // Arrange
+        var connection = Substitute.For<IConnection>();
+        connection.IsOpen.Returns(true);
+        var channel = Substitute.For<IChannel>();
+        channel.IsOpen.Returns(true);
+        var attempts = 0;
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                if (Interlocked.Increment(ref attempts) == 1) return Task.FromResult(channel);
+
+                // Each recovery attempt fails and the broker closes the channel again, as a refused consume does.
+                channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, new ShutdownEventArgs(ShutdownInitiator.Peer, 404, "NOT_FOUND"));
+                throw new OperationInterruptedException(new ShutdownEventArgs(ShutdownInitiator.Peer, 404, "NOT_FOUND"));
+            });
+        var publisherChannel = await PublisherChannel.CreateAsync(connection, TimeSpan.FromHours(1), new ProtocolSerializer(), NullLoggerFactory.Instance)
+            .ConfigureAwait(false);
+        channel.IsOpen.Returns(false);
+
+        // Act
+        channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, new ShutdownEventArgs(ShutdownInitiator.Peer, 404, "NOT_FOUND"));
+        await Wait.UntilAsync(() => Volatile.Read(ref attempts) >= 2, "the first recovery attempt").ConfigureAwait(false);
+        await Task.Delay(200).ConfigureAwait(false);
+
+        // Assert
+        Assert.AreEqual(2, Volatile.Read(ref attempts));
+        await publisherChannel.DisposeAsync().ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task BrokerUnreachableWhileRecovering_Disposed_DisposeCompletesAndPublishFails()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+
+        // Act
+        var dispose = _channel.DisposeAsync().AsTask();
+
+        // Assert
+        await Wait.UntilAsync(() => dispose.IsCompleted && publish.IsCompleted, "dispose and the waiting publish complete during the outage")
+            .ConfigureAwait(false);
+        await dispose.ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => publish).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task BrokerUnreachableWhileRecovering_TokenCancelled_FailsAsUnreachable()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+        using var cts = new CancellationTokenSource();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        try
+        {
+            // Act
+            cts.Cancel();
+
+            // Assert
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the broker is unreachable")
+                .ConfigureAwait(false);
+            await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+        }
+        finally
+        {
+            MakeBrokerReachable();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task ConnectionBackWhileTheChannelIsStillRecovering_TokenCancelled_FailsAsUnreachable()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+        _connection.IsOpen.Returns(true);
+        using var cts = new CancellationTokenSource();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        try
+        {
+            // Act
+            cts.Cancel();
+
+            // Assert
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the channel is reopened")
+                .ConfigureAwait(false);
+            await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+        }
+        finally
+        {
+            MakeBrokerReachable();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ConnectionOpen_TokenAlreadyCancelled_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        // Assert
+        await AssertCancelledAsync(publish, PublishFailureReason.Unknown).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ConnectionForcedClosed_PublishOnTheClosedChannel_FailsAsUnreachable()
+    {
+        // Arrange
+        _connection.IsOpen.Returns(false);
+        ChannelAlreadyClosedBy(new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED"));
+
+        // Act
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+
+        // Assert
+        await AssertClosedAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosedByAnotherPublishsRefusal_PublishOnTheClosedChannel_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        ChannelAlreadyClosedBy(new ShutdownEventArgs(ShutdownInitiator.Peer, 404, "NOT_FOUND", 60, 40));
+
+        // Act
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+
+        // Assert
+        await AssertClosedAsync(publish, PublishFailureReason.Unknown).ConfigureAwait(false);
+    }
+
+    // The client may race a publish against the close it is handling, so CarrotMQ must not hand it one.
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelShutdownReceived_PublishBeforeItReopens_IsNotHandedToTheClosedChannel()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+        ClientClosesTheChannel();
+
+        // Act
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        // Assert
+        await VerifyBasicPublishAsync(0).ConfigureAwait(false);
+        cts.Cancel();
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosed_PublishWaits_IsSentOnceTheClientReopensTheChannel()
+    {
+        // Arrange
+        ClientClosesTheChannel();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+        var sentWhileClosed = CountBasicPublishes();
+
+        // Act
+        ClientReopensTheChannel();
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the waiting publish completes after the reopen").ConfigureAwait(false);
+        await publish.ConfigureAwait(false);
+        Assert.AreEqual(0, sentWhileClosed);
+        await VerifyBasicPublishAsync(1).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosed_TokenCancelledWhileWaitingForTheReopen_FailsAsUnreachable()
+    {
+        // Arrange
+        ClientClosesTheChannel();
+        using var cts = new CancellationTokenSource();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        // Act
+        cts.Cancel();
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes").ConfigureAwait(false);
+        await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+        await VerifyBasicPublishAsync(0).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task ChannelClosed_DisposedWhileWaitingForTheReopen_PublishFails()
+    {
+        // Arrange
+        ClientClosesTheChannel();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), CancellationToken.None);
+
+        // Act
+        await _channel.DisposeAsync().ConfigureAwait(false);
+
+        // Assert
+        await Wait.UntilAsync(() => publish.IsCompleted, "the waiting publish completes once the channel is disposed").ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<ObjectDisposedException>(() => publish).ConfigureAwait(false);
+        await VerifyBasicPublishAsync(0).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    public async Task ChannelCannotBeCreated_DoesNotSubscribeToTheConnection()
+    {
+        // Arrange
+        var connection = Substitute.For<IConnection>();
+        connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>())
+            .Returns<Task<IChannel>>(_ => throw new BrokerUnreachableException(new InvalidOperationException("down")));
+
+        // Act
+        await Assert.ThrowsExactlyAsync<BrokerUnreachableException>(
+                () => PublisherChannel.CreateAsync(connection, TimeSpan.FromSeconds(2), new ProtocolSerializer(), NullLoggerFactory.Instance))
+            .ConfigureAwait(false);
+
+        // Assert
+        connection.DidNotReceive().RecoverySucceededAsync += Arg.Any<AsyncEventHandler<AsyncEventArgs>>();
+    }
+
+    // A close below 400 is left to the client's own recovery, which reopens the same channel.
+    private void ClientClosesTheChannel()
+    {
+        _rabbitChannel.IsOpen.Returns(false);
+        _rabbitChannel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(
+            _rabbitChannel,
+            new ShutdownEventArgs(ShutdownInitiator.Peer, 320, "CONNECTION_FORCED"));
+    }
+
+    private void ClientReopensTheChannel()
+    {
+        _rabbitChannel.IsOpen.Returns(true);
+        _connection.RecoverySucceededAsync += Raise.Event<AsyncEventHandler<AsyncEventArgs>>(_connection, AsyncEventArgs.Empty);
+    }
+
+    private int CountBasicPublishes()
+    {
+        return _rabbitChannel.ReceivedCalls()
+            .Count(c => string.Equals(c.GetMethodInfo().Name, nameof(IChannel.BasicPublishAsync), StringComparison.Ordinal));
+    }
+
+    private Task VerifyBasicPublishAsync(int times)
+    {
+        return _rabbitChannel.Received(times)
+            .BasicPublishAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<BasicProperties>(),
+                Arg.Any<ReadOnlyMemory<byte>>(),
+                Arg.Any<CancellationToken>())
+            .AsTask();
+    }
+
+    // The client still reports the channel open, then rejects the publish: the close arrived during it.
+    private void ChannelAlreadyClosedBy(ShutdownEventArgs close)
+    {
+        _rabbitChannel.When(m => m.BasicPublishAsync(
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<bool>(),
+                Arg.Any<BasicProperties>(),
+                Arg.Any<ReadOnlyMemory<byte>>(),
+                Arg.Any<CancellationToken>()))
+            .Do(_ => throw new AlreadyClosedException(close));
+    }
+
+    private static async Task AssertClosedAsync(Task publish, PublishFailureReason reason)
+    {
+        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
+        Assert.AreEqual(reason, exception.Reason, exception.Message);
+        Assert.IsInstanceOfType<AlreadyClosedException>(exception.InnerException);
+    }
+
+    private static async Task AssertCancelledAsync(Task publish, PublishFailureReason reason)
+    {
+        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
+        Assert.AreEqual(reason, exception.Reason);
+        Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
+    }
+
+    // Closes the channel like a lost connection; the recovery loop keeps failing to reopen it and holds ChannelLock.
+    private async Task MakeBrokerUnreachableAsync()
+    {
+        _connection.IsOpen.Returns(false);
+        _rabbitChannel.IsOpen.Returns(false);
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>())
+            .Returns<IChannel>(_ => throw new BrokerUnreachableException(new InvalidOperationException("broker down")));
+        var opensBefore = CountChannelOpens();
+        _rabbitChannel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await Wait.UntilAsync(() => CountChannelOpens() > opensBefore, "the recovery loop tries to reopen the channel").ConfigureAwait(false);
+    }
+
+    private void MakeBrokerReachable()
+    {
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>()).Returns(_ => Task.FromResult(_rabbitChannel));
+        _rabbitChannel.IsOpen.Returns(true);
+        _connection.IsOpen.Returns(true);
+    }
+
+    private int CountChannelOpens()
+    {
+        return _connection.ReceivedCalls()
+            .Count(c => string.Equals(c.GetMethodInfo().Name, nameof(IConnection.CreateChannelAsync), StringComparison.Ordinal));
+    }
+
 
     [TestMethod]
     public async Task BasicProperties_ContentType()
@@ -124,5 +456,59 @@ public class PublisherChannelTests
         await _channel.PublishAsync(new CarrotMessage(header, string.Empty), CancellationToken.None);
 
         Assert.AreEqual(appId.ToString(), _basicProperties.AppId);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task BrokerUnreachableWhileRecovering_DeclareExchange_WaitsForTheReopenInsteadOfFailing()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+
+        // Act
+        var declare = _channel.DeclareExchangeAsync("exchange", "fanout", true, false);
+        MakeBrokerReachable();
+
+        // Assert
+        await declare.ConfigureAwait(false);
+        await _rabbitChannel.Received(1)
+            .ExchangeDeclareAsync(
+                "exchange",
+                "fanout",
+                Arg.Is(true),
+                Arg.Is(false),
+                Arg.Any<IDictionary<string, object?>?>(),
+                Arg.Any<bool>(),
+                Arg.Any<bool>(),
+                Arg.Any<CancellationToken>())
+            .ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task ChannelClosedByTheBrokerWhileTheConnectionIsOpen_TokenCancelledWhileWaitingForTheReopen_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        var refusal = new ShutdownEventArgs(ShutdownInitiator.Peer, 404, "NOT_FOUND", 60, 40);
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>())
+            .Returns<IChannel>(_ => throw new OperationInterruptedException(refusal));
+        _rabbitChannel.IsOpen.Returns(false);
+        _rabbitChannel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, refusal);
+        using var cts = new CancellationTokenSource();
+        var publish = _channel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        try
+        {
+            // Act
+            cts.Cancel();
+
+            // Assert
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes").ConfigureAwait(false);
+            await AssertCancelledAsync(publish, PublishFailureReason.Unknown).ConfigureAwait(false);
+        }
+        finally
+        {
+            MakeBrokerReachable();
+        }
     }
 }

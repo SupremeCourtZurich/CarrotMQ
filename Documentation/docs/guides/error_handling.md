@@ -126,8 +126,10 @@ Middleware can also influence error handling by setting `context.IsErrorResult =
 
 | Exception | When it is thrown |
 |---|---|
-| `OperationCanceledException` | The configured TTL expired before a response was received, or the provided `CancellationToken` was cancelled. |
-| `RetryLimitExceededException` | Publisher confirms could not be obtained within the configured retry limit. The message may or may not have been delivered. |
+| `OperationCanceledException` | The provided `CancellationToken` was cancelled, or the TTL expired: before the broker confirmed the message, or before a request's response arrived (a request without a positive TTL waits at most 5 seconds). When the publish itself did not complete, the `InnerException` is a `PublishFailedException` whose `Reason` tells whether the broker was unreachable. |
+| `RetryLimitExceededException` | Publisher confirms could not be obtained within the configured retry limit. The message may or may not have been delivered. Derives from `PublishFailedException`, whose `Reason` tells why (see [Publisher Confirms](../configuration/publisher_confirms.md#why-it-failed)). |
+| `PublishFailedException` | No connection to the broker could be established within `InitialConnectionTimeout`, or, without publisher confirms, the channel was closed while the message was sent. `Reason` is `Unreachable` while the connection is down (see [While the Broker Is Unreachable](../configuration/publisher_confirms.md#while-the-broker-is-unreachable)). |
+| `ObjectDisposedException` | The connection was closed (e.g. at host shutdown) while the send was still waiting for a confirm or for the channel to reopen. The message may or may not have been delivered. A request already waiting for its reply ends with `OperationCanceledException` once its TTL expires. |
 | `ArgumentException` | The message has invalid properties — for example, a `ICustomRoutingEvent` was published with an exchange name that contains illegal characters. |
 
 Wrap `SendReceiveAsync` (and fire-and-forget send calls in critical paths) in a `try/catch` to handle these cases gracefully:
@@ -138,13 +140,21 @@ try
     var response = await carrotClient.SendReceiveAsync(new MyQuery { /* ... */ });
     // handle response
 }
+catch (OperationCanceledException ex) when (ex.InnerException is PublishFailedException { Reason: PublishFailureReason.Unreachable })
+{
+    // The TTL expired while the broker was unreachable — back off and retry later
+}
 catch (OperationCanceledException)
 {
-    // TTL expired or cancellation was requested
+    // No response within the TTL, or cancellation was requested
 }
-catch (RetryLimitExceededException)
+catch (PublishFailedException ex) when (ex.Reason == PublishFailureReason.Unreachable)
 {
-    // Could not confirm delivery — consider compensating action
+    // Broker unreachable, also when the retries ran out on a lost connection — back off and retry later
+}
+catch (PublishFailedException)
+{
+    // Could not confirm delivery (RetryLimitExceededException) — consider compensating action
 }
 catch (ArgumentException ex)
 {

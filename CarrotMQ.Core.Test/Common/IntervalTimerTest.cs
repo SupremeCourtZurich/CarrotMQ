@@ -5,6 +5,33 @@ namespace CarrotMQ.Core.Test.Common;
 [TestClass]
 public class IntervalTimerTest
 {
+    // Without the guard the timer restart after the handler throws in an async void method and kills the test host.
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task DisposedWhileTheElapsedHandlerRuns_HandlerFinishesWithoutError()
+    {
+        // Arrange
+        var handlerEntered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource<bool>();
+        var handlerFinished = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var timer = new IntervalTimer(1);
+        timer.ElapsedAsync += async (_, _) =>
+        {
+            handlerEntered.TrySetResult(true);
+            await releaseHandler.Task.ConfigureAwait(false);
+            handlerFinished.TrySetResult(true);
+        };
+        timer.Start();
+        await handlerEntered.Task.ConfigureAwait(false);
+
+        // Act
+        timer.Dispose();
+        releaseHandler.SetResult(true);
+
+        // Assert
+        await handlerFinished.Task.ConfigureAwait(false);
+    }
+
     [TestMethod]
     public async Task TimerNotStarted_ShouldNotTrigger_Test()
     {

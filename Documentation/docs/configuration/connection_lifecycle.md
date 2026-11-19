@@ -52,6 +52,8 @@ builder.ConfigureBrokerConnection(options =>
 
 When the timeout expires, `BrokerUnreachableException` is thrown. The .NET host treats this as a fatal startup error and terminates.
 
+A publish that waits for the first connection is bounded by the message's TTL and the caller's `CancellationToken`, not only by this timeout. When the TTL expires or the token is cancelled, it fails with `OperationCanceledException` whose `InnerException` is a `PublishFailedException` (`Reason = Unreachable`); when this timeout passes first, with that `PublishFailedException` itself. See [While the Broker Is Unreachable](publisher_confirms.md#while-the-broker-is-unreachable).
+
 > **Tip:** Prefer `InfiniteTimeSpan` in orchestrated environments and a finite timeout in development so that misconfigured endpoints surface quickly.
 
 ---
@@ -121,6 +123,8 @@ When the .NET host stops (e.g. `Ctrl+C`, `SIGTERM`, rolling deployment), the fol
 ### Drain guarantee
 
 CarrotMQ waits for every in-flight handler to finish before closing channels. No acknowledged message is left mid-processing by the library itself.
+
+A publish that is still waiting when its channel is closed (for a confirm or for the channel to reopen) fails with `ObjectDisposedException`. The broker may still have received the message.
 
 ### Hard deadline — host `ShutdownTimeout`
 
