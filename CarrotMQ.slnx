@@ -16,7 +16,6 @@
   <Project Path="CarrotMQ.Core.Test/CarrotMQ.Core.Test.csproj" />
   <Project Path="CarrotMQ.Core/CarrotMQ.Core.csproj" />
   <Project Path="CarrotMQ.RabbitMQ.Test.Integration/CarrotMQ.RabbitMQ.Test.Integration.csproj" />
-  <Project Path="CarrotMQ.RabbitMQ.Test.Load/CarrotMQ.RabbitMQ.Test.Load.csproj" />
   <Project Path="CarrotMQ.RabbitMQ.Test/CarrotMQ.RabbitMQ.Test.csproj" />
   <Project Path="CarrotMQ.RabbitMQ/CarrotMQ.RabbitMQ.csproj" />
   <Project Path="Documentation/Documentation.csproj" />
