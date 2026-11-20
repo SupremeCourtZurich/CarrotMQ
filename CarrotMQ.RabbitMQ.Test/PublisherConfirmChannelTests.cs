@@ -7,6 +7,7 @@ using CarrotMQ.RabbitMQ.Test.Helper;
 using NSubstitute;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
 using AckAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.BasicAckEventArgs>;
 using NAckAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.BasicNackEventArgs>;
 using ShutdownAsyncEventHandler = RabbitMQ.Client.Events.AsyncEventHandler<RabbitMQ.Client.Events.ShutdownEventArgs>;
@@ -18,6 +19,7 @@ namespace CarrotMQ.RabbitMQ.Test;
 [TestClass]
 public class PublisherConfirmChannelTests
 {
+    private static readonly ShutdownEventArgs Refusal = new(ShutdownInitiator.Peer, 404, "NOT_FOUND", 60, 40);
     private readonly DateTime _dateTimeNow = new(2023, 05, 12, 11, 29, 59);
     private readonly PublisherConfirmOptions _publisherConfirmOptions = new();
     private IConnection _connection = null!;
@@ -50,6 +52,7 @@ public class PublisherConfirmChannelTests
 #endif
 
         _connection = Substitute.For<IConnection>();
+        _connection.IsOpen.Returns(true);
         _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>())
             .Returns(_ =>
             {
@@ -61,19 +64,17 @@ public class PublisherConfirmChannelTests
         _dateTimeProvider = Substitute.For<IDateTimeProvider>();
         _dateTimeProvider.Now.Returns(_dateTimeNow);
 
-        _publisherConfirmChannel = await PublisherConfirmChannel.CreateAsync(
-                _connection,
-                TimeSpan.FromSeconds(2),
-                _publisherConfirmOptions,
-                new ProtocolSerializer(),
-                TestLoggerFactory.Instance,
-                _intervalTimer,
-                _dateTimeProvider) as PublisherConfirmChannel
-            ?? throw new InvalidOperationException();
+        _publisherConfirmChannel = await CreatePublisherConfirmChannelAsync().ConfigureAwait(false);
 
         await VerifyInitialCallsAsync().ConfigureAwait(false);
 
         await FireRepublishTimerEventAsync().ConfigureAwait(false); // Trigger timer for first OnTimedEvent (avoid "republishAll" call)
+    }
+
+    [TestCleanup]
+    public async Task Cleanup()
+    {
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
     }
 
     [TestMethod]
@@ -181,7 +182,7 @@ public class PublisherConfirmChannelTests
 
         // 2) Cancel publish
         tokenSource.Cancel();
-        await Assert.ThrowsAsync<TaskCanceledException>(() => task).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<PublishFailedException>(() => task).ConfigureAwait(false);
 
         // Nothing should be republished
         await RepublishAsync(1).ConfigureAwait(false);
@@ -202,13 +203,13 @@ public class PublisherConfirmChannelTests
 
         // 3) Cancel first 3 publishes
         tokenSource.Cancel();
-        await Assert.ThrowsAsync<TaskCanceledException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<PublishFailedException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
 
         // Republish last message
         await RepublishAsync(1).ConfigureAwait(false);
 
         // verify
-        Assert.IsTrue(tasks.All(t => t.IsCanceled));
+        Assert.IsTrue(tasks.All(t => t.Exception?.InnerException is PublishFailedException { InnerException: OperationCanceledException }));
         await VerifyBasicPublishAsync(5).ConfigureAwait(false);
     }
 
@@ -281,6 +282,246 @@ public class PublisherConfirmChannelTests
         await VerifyBasicPublishAsync(noOfMessages + 1).ConfigureAwait(false);
     }
 
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RetryLimitReachedWithoutAClose_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        var task = PublishAsync(1, CancellationToken.None).Single();
+
+        // Act
+        await RepublishAsync(_publisherConfirmOptions.RetryLimit + 1).ConfigureAwait(false);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+        Assert.AreEqual(PublishFailureReason.Unknown, exception.Reason);
+        Assert.IsNull(exception.InnerException);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RetryLimitReachedByAConnectionLevelClose_FailsAsUnreachable()
+    {
+        // Arrange
+        var task = PublishAsync(1, CancellationToken.None).Single();
+        await RepublishAsync(_publisherConfirmOptions.RetryLimit).ConfigureAwait(false);
+        CloseChannel(new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), 2).ConfigureAwait(false);
+
+        // Act
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+        Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason);
+        Assert.IsInstanceOfType<AlreadyClosedException>(exception.InnerException);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task RetryLimitReachedByARefusalClose_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        var task = PublishAsync(1, CancellationToken.None).Single();
+        await RepublishAsync(_publisherConfirmOptions.RetryLimit).ConfigureAwait(false);
+        RefuseMainChannel();
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), 2).ConfigureAwait(false);
+
+        // Act
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+        Assert.AreEqual(PublishFailureReason.Unknown, exception.Reason);
+        Assert.IsInstanceOfType<AlreadyClosedException>(exception.InnerException);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task TimeoutsAfterAConnectionLevelClose_RetryLimitFailsWithAnUnknownReason()
+    {
+        // Arrange
+        var task = PublishAsync(1, CancellationToken.None).Single();
+        CloseChannel(new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), 2).ConfigureAwait(false);
+
+        // Act
+        await RepublishAsync(_publisherConfirmOptions.RetryLimit + 1).ConfigureAwait(false);
+
+        // Assert
+        var exception = await Assert.ThrowsAsync<RetryLimitExceededException>(() => task).ConfigureAwait(false);
+        Assert.AreEqual(PublishFailureReason.Unknown, exception.Reason);
+        Assert.IsNull(exception.InnerException);
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task BrokerUnreachableWhileRecovering_TokenCancelled_FailsAsUnreachable()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+        using var cts = new CancellationTokenSource();
+        var publish = _publisherConfirmChannel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), cts.Token);
+
+        try
+        {
+            // Act
+            cts.Cancel();
+
+            // Assert
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the broker is unreachable")
+                .ConfigureAwait(false);
+            await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+        }
+        finally
+        {
+            MakeBrokerReachable();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task ConnectionBackWhileTheChannelIsStillRecovering_TokenCancelled_FailsAsUnreachable()
+    {
+        // Arrange
+        await MakeBrokerUnreachableAsync().ConfigureAwait(false);
+        _connection.IsOpen.Returns(true);
+        using var cts = new CancellationTokenSource();
+        var publish = PublishOneAsync(cts.Token);
+
+        try
+        {
+            // Act
+            cts.Cancel();
+
+            // Assert
+            await Wait.UntilAsync(() => publish.IsCompleted, "the cancelled publish completes while the channel is reopened")
+                .ConfigureAwait(false);
+            await AssertCancelledAsync(publish, PublishFailureReason.Unreachable).ConfigureAwait(false);
+        }
+        finally
+        {
+            MakeBrokerReachable();
+        }
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task TokenCancelledWhileWaitingForTheConfirm_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+        var task = PublishAsync(1, cts.Token).Single();
+
+        // Act
+        cts.Cancel();
+
+        // Assert
+        await AssertCancelledAsync(task, PublishFailureReason.Unknown).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task TokenCancelledAfterTheConnectionWasLostAndRecovered_FailsAsUnreachable()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+        var task = PublishAsync(1, cts.Token).Single();
+        CloseChannel(new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), 2).ConfigureAwait(false);
+        await FireRepublishTimerEventAsync().ConfigureAwait(false);
+
+        // Act
+        cts.Cancel();
+
+        // Assert
+        await AssertCancelledAsync(task, PublishFailureReason.Unreachable).ConfigureAwait(false);
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task MaxConcurrentConfirmsReached_TokenCancelled_FailsWithAnUnknownReason()
+    {
+        // Arrange
+        await RecreateChannelAsync(options => options.MaxConcurrentConfirms = 1).ConfigureAwait(false);
+        PublishAsync(1, CancellationToken.None);
+        using var cts = new CancellationTokenSource();
+        var waiting = PublishOneAsync(cts.Token);
+
+        // Act
+        cts.Cancel();
+
+        // Assert
+        await AssertCancelledAsync(waiting, PublishFailureReason.Unknown).ConfigureAwait(false);
+    }
+
+    private static async Task AssertCancelledAsync(Task publish, PublishFailureReason reason)
+    {
+        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
+        Assert.AreEqual(reason, exception.Reason);
+        Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
+    }
+
+    private static Task WaitForCallsAsync<T>(T substitute, string methodName, int count)
+        where T : class
+    {
+        return Wait.UntilAsync(
+            () => substitute.ReceivedCalls().Count(c => string.Equals(c.GetMethodInfo().Name, methodName, StringComparison.Ordinal)) >= count,
+            $"{methodName} called {count} times");
+    }
+
+
+    private async Task<PublisherConfirmChannel> CreatePublisherConfirmChannelAsync()
+    {
+        return await PublisherConfirmChannel.CreateAsync(
+                _connection,
+                TimeSpan.FromSeconds(2),
+                _publisherConfirmOptions,
+                new ProtocolSerializer(),
+                TestLoggerFactory.Instance,
+                _intervalTimer,
+                _dateTimeProvider)
+            .ConfigureAwait(false) as PublisherConfirmChannel
+            ?? throw new InvalidOperationException();
+    }
+
+    // Closes the main channel like a lost connection; the recovery loop keeps failing to reopen it and holds ChannelLock.
+    private async Task MakeBrokerUnreachableAsync()
+    {
+        _connection.IsOpen.Returns(false);
+        _channel.IsOpen.Returns(false);
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>())
+            .Returns<IChannel>(_ => throw new BrokerUnreachableException(new InvalidOperationException("broker down")));
+        var opensBefore = _connection.ReceivedCalls()
+            .Count(c => string.Equals(c.GetMethodInfo().Name, nameof(IConnection.CreateChannelAsync), StringComparison.Ordinal));
+        _channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, new ShutdownEventArgs(ShutdownInitiator.Library, 541, "Unexpected"));
+        await WaitForCallsAsync(_connection, nameof(IConnection.CreateChannelAsync), opensBefore + 1).ConfigureAwait(false);
+    }
+
+    private void MakeBrokerReachable()
+    {
+        _connection.CreateChannelAsync(Arg.Any<CreateChannelOptions>(), Arg.Any<CancellationToken>()).Returns(_channel);
+        _channel.IsOpen.Returns(true);
+        _connection.IsOpen.Returns(true);
+    }
+
+    private Task PublishOneAsync(CancellationToken token = default)
+    {
+        return _publisherConfirmChannel.PublishAsync(new CarrotMessage(new CarrotHeader(), string.Empty), token);
+    }
+
+    private void RefuseMainChannel()
+    {
+        CloseChannel(Refusal);
+    }
+
+    private async Task RecreateChannelAsync(Action<PublisherConfirmOptions> configure)
+    {
+        await _publisherConfirmChannel.DisposeAsync().ConfigureAwait(false);
+        configure(_publisherConfirmOptions);
+        _publisherConfirmChannel = await CreatePublisherConfirmChannelAsync().ConfigureAwait(false);
+    }
+
     private Task[] PublishAsync(int noOfMessages, CancellationToken token)
     {
         if (noOfMessages <= 0) return [];
@@ -316,9 +557,10 @@ public class PublisherConfirmChannelTests
         return [.. publishingTasks];
     }
 
-    private async Task RepublishAsync(int times)
+    // Each round advances the clock past RetryIntervalInMs; roundsDone continues after earlier rounds.
+    private async Task RepublishAsync(int times, int roundsDone = 0)
     {
-        var dateTimeNow = _dateTimeNow;
+        var dateTimeNow = _dateTimeNow.AddMilliseconds(roundsDone * (_publisherConfirmOptions.RetryIntervalInMs + 1.0));
         for (var i = 0; i < times; i++)
         {
             dateTimeNow = dateTimeNow.AddMilliseconds(_publisherConfirmOptions.RetryIntervalInMs + 1);
@@ -330,6 +572,16 @@ public class PublisherConfirmChannelTests
     private async Task FireRepublishTimerEventAsync()
     {
         await _intervalTimer.FireTimedEvent(new IIntervalTimer.IntervalTimerElapsedEventArgs()).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Closes the channel and lets exactly one recovery reopen it (recovery checks <c>IsOpen</c> twice).
+    /// </summary>
+    private void CloseChannel(ShutdownEventArgs shutdownEventArgs)
+    {
+        var closedChecks = 2;
+        _channel.IsOpen.Returns(_ => Interlocked.Decrement(ref closedChecks) < 0);
+        _channel.ChannelShutdownAsync += Raise.Event<ShutdownAsyncEventHandler>(null, shutdownEventArgs);
     }
 
     private void FireChannelShutdown()
@@ -418,4 +670,5 @@ public class PublisherConfirmChannelTests
         _channel.Received().BasicAcksAsync += Arg.Any<AckAsyncEventHandler>();
         _channel.Received().BasicNacksAsync += Arg.Any<NAckAsyncEventHandler>();
     }
+
 }

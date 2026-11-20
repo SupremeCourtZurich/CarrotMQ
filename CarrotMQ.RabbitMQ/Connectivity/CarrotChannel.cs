@@ -39,6 +39,11 @@ internal class CarrotChannel : ICarrotChannel
     protected ILogger Logger { get; }
 
     /// <summary>
+    /// The reason of the last shutdown of <see cref="Channel" />, or <c>null</c> before the first one.
+    /// </summary>
+    protected ShutdownEventArgs? LastShutdownReason { get; private set; }
+
+    /// <summary>
     /// The underlying RabbitMQ channel for communication.
     /// </summary>
     protected IChannel? Channel { get; set; }
@@ -265,6 +270,7 @@ internal class CarrotChannel : ICarrotChannel
         if (IsDisposed) return Task.CompletedTask;
 
         Logger.LogInformation("Channel shutdown. Reason: {ReplyCode}:{ReplyText}", shutdownEventArgs.ReplyCode, shutdownEventArgs.ReplyText);
+        LastShutdownReason = shutdownEventArgs;
 
         OnTransportErrorReceived(
             new TransportErrorReceivedEventArgs { ErrorReason = TransportErrorReceivedEventArgs.TransportErrorReason.ChannelInterrupted });
