@@ -36,7 +36,7 @@ Microservice -down-> "CarrotMQ<U+002E>RabbitMQ"
 ```
 
 ### Dto Project
-For the Dto project, create a .NET 9 Class Library project. Inside this project, we will define the endpoints and events.
+For the Dto project, create a .NET 10 Class Library project. Inside this project, we will define the endpoints and events.
 
 This project should reference the **CarrotMQ.Core** nuget package.
 
@@ -52,7 +52,7 @@ This project should reference the **CarrotMQ.Core** nuget package.
 
 ### Microservice Project
 
-For the microservice project, create a .NET 9 console project.
+For the microservice project, create a .NET 10 console project.
 
 This project should reference the **CarrotMQ.RabbitMQ** nuget package and the **Dto** project.
 
@@ -70,7 +70,7 @@ In the Program.cs of your microservice project, configure CarrotMQ for RabbitMQ.
 
 ### Client Project
 
-For the client project, create a .NET 9 console project (this could be any project type you can run).
+For the client project, create a .NET 10 console project (this could be any project type you can run).
 
 This project should also reference the **CarrotMQ.RabbitMQ** nuget package and the **Dto** project.
 
