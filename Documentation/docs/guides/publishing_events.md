@@ -114,7 +114,7 @@ await carrotClient.PublishAsync(
 | `PublisherConfirm` | `bool` | `true` | Waits for a broker acknowledgement before returning. Disable only if you can tolerate message loss. |
 | `Persistent` | `bool` | `false` | Marks the message as durable (written to disk). Only relevant for classic queues — quorum queues are always persistent. |
 | `Priority` | `byte` | `0` | Message priority (`0`–`9`). Requires a priority queue configured with a matching `x-max-priority` argument. |
-| `Ttl` | `int?` | `null` | Time-to-live in milliseconds. A single value that governs three phases of the message lifecycle: (1) the publisher-side send timeout, (2) the AMQP `expiration` header controlling how long the message can wait in the queue, and (3) the consumer-side processing deadline passed via `CancellationToken` to `HandleAsync`. `null` means no TTL is applied at any phase. |
+| `Ttl` | `int?` | `null` | Time-to-live in milliseconds. A single value that governs four phases of the message lifecycle: (1) the publisher-side send timeout, (2) the AMQP `expiration` header controlling how long the message can wait in the queue, (3) the consumer-side processing deadline passed via `CancellationToken` to `HandleAsync`, and (4) the publish of a response, which must complete within the same deadline, counted from the message's arrival. `null` means no TTL is applied at any phase; a response is then bounded by 5 seconds after the handler ended. |
 
 `MessageProperties` is a `record struct`. `MessageProperties.Default` is equivalent to `new MessageProperties { PublisherConfirm = true }`.
 

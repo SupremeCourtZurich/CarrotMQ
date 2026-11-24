@@ -175,9 +175,10 @@ public class PublisherChannelTests
 
     private static async Task AssertCancelledAsync(Task publish, PublishFailureReason reason)
     {
-        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
-        Assert.AreEqual(reason, exception.Reason);
-        Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
+        var exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => publish).ConfigureAwait(false);
+        Assert.IsTrue(exception.CancellationToken.IsCancellationRequested, "The exception carries the cancelled token.");
+        var failure = Assert.IsInstanceOfType<PublishFailedException>(exception.InnerException);
+        Assert.AreEqual(reason, failure.Reason);
     }
 
     // Closes the channel like a lost connection; the recovery loop keeps failing to reopen it and holds ChannelLock.

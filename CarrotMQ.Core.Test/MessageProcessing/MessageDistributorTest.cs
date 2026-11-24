@@ -10,7 +10,9 @@ using CarrotMQ.Core.Protocol;
 using CarrotMQ.Core.Serialization;
 using CarrotMQ.Core.Telemetry;
 using CarrotMQ.Core.Test.Helper;
+using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace CarrotMQ.Core.Test.MessageProcessing;
@@ -19,6 +21,8 @@ namespace CarrotMQ.Core.Test.MessageProcessing;
 public class MessageDistributorTest
 {
     private static List<TestCommand> s_handledMessages = new();
+    private static TimeSpan s_handlerDelay;
+    private static TaskCompletionSource<bool> s_handlerStarted = new();
     private readonly ICarrotSerializer _carrotSerializer = new DefaultCarrotSerializer();
 
     private IDependencyInjector _dependencyInjector = null!;
@@ -29,6 +33,7 @@ public class MessageDistributorTest
     public void Setup()
     {
         s_handledMessages = new List<TestCommand>();
+        s_handlerStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         _dependencyInjector = Substitute.For<IDependencyInjector>();
         _dependencyInjector.CreateAsyncScope().Returns(_dependencyInjector);
@@ -135,6 +140,129 @@ public class MessageDistributorTest
         Assert.HasCount(1, s_handledMessages, "handled messages count");
     }
 
+    [TestMethod]
+    [Timeout(10_000)]
+    public async Task HandlerTakesPartOfTheTtl_ResponseTokenFiresAtTheTtlCountedFromArrival()
+    {
+        // Arrange
+        const int ttl = 2_000;
+        s_handlerDelay = TimeSpan.FromMilliseconds(ttl * 0.6);
+        var (distributor, _, cancelledAtCall) = CreateDistributorWithResponseSenderSpy(waitForCancellation: true);
+        _handlerConfiguration.AddCommand<DelayCommandHandler, TestCommand, TestResponse>();
+        _dependencyInjector.CreateHandler<DelayCommandHandler, TestCommand, TestResponse>().Returns(new DelayCommandHandler());
+        var stopwatch = Stopwatch.StartNew();
+
+        // Act
+        await distributor.DistributeAsync(CreateRequest(ttl), CancellationToken.None).ConfigureAwait(false);
+
+        // Assert
+        Assert.IsFalse(cancelledAtCall(), "The response token was already cancelled when the response was sent.");
+        Assert.IsLessThan(ttl * 1.4, stopwatch.ElapsedMilliseconds, "The response token fired long after the TTL.");
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task HandlerRunsPastTheTtl_ResponseIsDroppedWithAWarning()
+    {
+        // Arrange
+        var transport = Substitute.For<ITransport>();
+        CancellationToken sentWith = default;
+        transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Do<CancellationToken>(t => sentWith = t))
+            .Returns(ci => FailWhenCancelledAsync(ci.Arg<CancellationToken>()));
+        var logger = new ResponseSenderTest.ResponseSenderLogger();
+        var distributor = new MessageDistributor(
+            _dependencyInjector,
+            _handlerConfiguration,
+            new ResponseSender(transport, _carrotSerializer, Substitute.For<ICarrotMetricsRecorder>(), logger),
+            TestLoggerFactory.CreateLogger<MessageDistributor>());
+        _handlerConfiguration.AddCommand<EndlessCommandHandler, TestCommand, TestResponse>();
+        _dependencyInjector.CreateHandler<EndlessCommandHandler, TestCommand, TestResponse>().Returns(new EndlessCommandHandler());
+
+        // Act
+        var deliveryStatus = await distributor.DistributeAsync(CreateRequest(50), CancellationToken.None).ConfigureAwait(false);
+
+        // Assert
+        Assert.AreEqual(DeliveryStatus.Ack, deliveryStatus);
+        Assert.IsTrue(sentWith.IsCancellationRequested, "The response was sent with a token that outlived the TTL.");
+        Assert.AreEqual(1, logger.LogMessages.Count(l => l == LogLevel.Warning));
+    }
+
+    [TestMethod]
+    [Timeout(5_000)]
+    [DataRow(null)]
+    [DataRow(0)]
+    public async Task NoPositiveTtlAndTheConsumerCancelsTheHandler_ResponseIsStillSentWithinABound(int? ttl)
+    {
+        // Arrange
+        var (distributor, responseToken, cancelledAtCall) = CreateDistributorWithResponseSenderSpy();
+        _handlerConfiguration.AddCommand<EndlessCommandHandler, TestCommand, TestResponse>();
+        _dependencyInjector.CreateHandler<EndlessCommandHandler, TestCommand, TestResponse>().Returns(new EndlessCommandHandler());
+        using var consumerCts = new CancellationTokenSource();
+        var distribute = distributor.DistributeAsync(CreateRequest(ttl), consumerCts.Token);
+        await s_handlerStarted.Task.ConfigureAwait(false);
+
+        // Act
+        consumerCts.Cancel();
+        await distribute.ConfigureAwait(false);
+
+        // Assert
+        Assert.IsFalse(cancelledAtCall(), "The response token was cancelled with the handler.");
+        Assert.IsTrue(responseToken().CanBeCanceled, "The response publish has no bound.");
+    }
+
+    // With waitForCancellation the spy sends like a transport facing an unreachable broker: until its token fires.
+    private (MessageDistributor Distributor, Func<CancellationToken> ResponseToken, Func<bool> CancelledAtCall) CreateDistributorWithResponseSenderSpy(
+        bool waitForCancellation = false)
+    {
+        var responseSender = Substitute.For<IResponseSender>();
+        CancellationToken responseToken = default;
+        var cancelledAtCall = false;
+        responseSender.TrySendResponseAsync(
+                Arg.Any<MiddlewareContext>(),
+                Arg.Do<CancellationToken>(t =>
+                {
+                    responseToken = t;
+                    cancelledAtCall = t.IsCancellationRequested;
+                }))
+            .Returns(ci => waitForCancellation ? WaitForCancellationAsync(ci.Arg<CancellationToken>()) : Task.CompletedTask);
+        var distributor = new MessageDistributor(
+            _dependencyInjector,
+            _handlerConfiguration,
+            responseSender,
+            TestLoggerFactory.CreateLogger<MessageDistributor>());
+
+        return (distributor, () => responseToken, () => cancelledAtCall);
+    }
+
+    private CarrotMessage CreateRequest(int? ttl)
+    {
+        var header = new CarrotHeader
+        {
+            CalledMethod = typeof(TestCommand).FullName!,
+            ReplyRoutingKey = "MyRoutingKey",
+            MessageProperties = new MessageProperties { Ttl = ttl }
+        };
+
+        return new CarrotMessage(header, _carrotSerializer.Serialize(new TestCommand()));
+    }
+
+    private static async Task WaitForCancellationAsync(CancellationToken token)
+    {
+        await Task.Delay(Timeout.Infinite, token).ContinueWith(_ => { }, TaskScheduler.Default).ConfigureAwait(false);
+    }
+
+    private static async Task FailWhenCancelledAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex)
+        {
+            throw new OperationCanceledException("cancelled", new PublishFailedException("cancelled", PublishFailureReason.Unknown, ex), token);
+        }
+    }
+
     public class TestCommand : ICommand<TestCommand, TestResponse, TestQueueEndPoint>
     {
         public Guid RequestRunId { get; set; }
@@ -169,6 +297,20 @@ public class MessageDistributorTest
         }
     }
 
+    public sealed class DelayCommandHandler : CommandHandlerBase<TestCommand, TestResponse>
+    {
+        public override async Task<IHandlerResult> HandleAsync(
+            TestCommand command,
+            ConsumerContext consumerContext,
+            CancellationToken cancellationToken)
+        {
+            s_handledMessages.Add(command);
+            await Task.Delay(s_handlerDelay, cancellationToken).ConfigureAwait(false);
+
+            return Ok(new TestResponse { ResponseRunId = command.RequestRunId });
+        }
+    }
+
     public sealed class EndlessCommandHandler : CommandHandlerBase<TestCommand, TestResponse>
     {
         public override async Task<IHandlerResult> HandleAsync(
@@ -177,6 +319,7 @@ public class MessageDistributorTest
             CancellationToken cancellationToken)
         {
             s_handledMessages.Add(command);
+            s_handlerStarted.TrySetResult(true);
             try
             {
                 await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);

@@ -34,7 +34,7 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
         {
-            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex);
+            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex, token);
         }
         catch (AlreadyClosedException ex)
         {

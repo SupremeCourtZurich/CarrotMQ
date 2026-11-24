@@ -147,21 +147,20 @@ public sealed class CarrotClient : ICarrotClient
             message.Header.MessageProperties = msgProps;
         }
 
-        CarrotMessage responseMessage;
+        // Without a positive TTL the caller's token bounds the wait; without a cancellable token the default TTL does.
+        var timeout = message.Header.MessageProperties.Ttl > 0 ? message.Header.MessageProperties.Ttl
+            : cancellationToken.CanBeCanceled ? null : DefaultRequestTtlInMs;
 
-        // Without a positive TTL the wait for the reply is still bounded by the default TTL.
-        var ttl = message.Header.MessageProperties.Ttl is > 0 ? message.Header.MessageProperties.Ttl.Value : DefaultRequestTtlInMs;
-        using (var ttlSource = CreateTtlSource(ttl, cancellationToken))
+        CarrotMessage responseMessage;
+        if (timeout > 0)
         {
-            var token = ttlSource.Token;
-            try
-            {
-                responseMessage = await _transport.SendReceiveAsync(message, token).ConfigureAwait(false);
-            }
-            catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && token.IsCancellationRequested)
-            {
-                throw Cancelled(ex, cancellationToken, token);
-            }
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedTokenSource.CancelAfter(timeout.Value);
+            responseMessage = await _transport.SendReceiveAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
+        }
+        else
+        {
+            responseMessage = await _transport.SendReceiveAsync(message, cancellationToken).ConfigureAwait(false);
         }
 
         CarrotResponse<TRequest, TResponse> response;
@@ -186,29 +185,15 @@ public sealed class CarrotClient : ICarrotClient
         CarrotMessage message,
         CancellationToken cancellationToken)
     {
-        using var ttlSource = message.Header.MessageProperties.Ttl is > 0 ? CreateTtlSource(message.Header.MessageProperties.Ttl.Value, cancellationToken) : null;
-        var token = ttlSource?.Token ?? cancellationToken;
-        try
+        if (message.Header.MessageProperties.Ttl > 0)
         {
-            await _transport.SendAsync(message, token).ConfigureAwait(false);
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
+            await _transport.SendAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
         }
-        catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && token.IsCancellationRequested)
+        else
         {
-            throw Cancelled(ex, cancellationToken, token);
+            await _transport.SendAsync(message, cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static CancellationTokenSource CreateTtlSource(int ttlInMs, CancellationToken cancellationToken)
-    {
-        var ttlSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        ttlSource.CancelAfter(ttlInMs);
-
-        return ttlSource;
-    }
-
-    // Caller cancellation and TTL expiry both end in OperationCanceledException; the inner exception carries the reason.
-    private static OperationCanceledException Cancelled(PublishFailedException exception, CancellationToken callerToken, CancellationToken token)
-    {
-        return new OperationCanceledException(exception.Message, exception, callerToken.IsCancellationRequested ? callerToken : token);
     }
 }

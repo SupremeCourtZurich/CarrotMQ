@@ -106,7 +106,7 @@ public sealed class RabbitTransport : ITransport
         {
             var reason = PublishFailure.ReasonAtCancellation(_brokerConnection.CurrentConnection, PublishFailureReason.Unknown);
 
-            throw PublishFailure.Cancelled(header, reason, ex);
+            throw PublishFailure.Cancelled(header, reason, ex, token);
         }
         catch (Exception ex) when (ex is BrokerUnreachableException or OperationCanceledException)
         {

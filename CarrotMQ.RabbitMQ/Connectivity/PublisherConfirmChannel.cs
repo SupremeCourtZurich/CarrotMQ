@@ -99,11 +99,12 @@ internal class PublisherConfirmChannel : PublisherChannel
     /// <summary>
     /// Publishes a message asynchronously with publisher confirms.
     /// </summary>
-    /// <exception cref="PublishFailedException">
+    /// <exception cref="OperationCanceledException">
     /// Thrown when the <paramref name="token" /> is canceled before the broker confirmed the message; the
-    /// <see cref="OperationCanceledException" /> is the inner exception.
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
-    /// <exception cref="Exception">Thrown when an error occurs during the publish operation.</exception>
+    /// <exception cref="RetryLimitExceededException">Thrown when the message was not confirmed within the retry limit.</exception>
     public override async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
         try
@@ -112,7 +113,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         }
         catch (OperationCanceledException ex) when (token.IsCancellationRequested)
         {
-            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex);
+            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex, token);
         }
 
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -142,7 +143,7 @@ internal class PublisherConfirmChannel : PublisherChannel
         {
             var reason = PublishFailure.ReasonAtCancellation(Connection, IsOpen, confirmMessage.LastFailureReason);
 
-            throw PublishFailure.Cancelled(message.Header, reason, ex);
+            throw PublishFailure.Cancelled(message.Header, reason, ex, token);
         }
         finally
         {

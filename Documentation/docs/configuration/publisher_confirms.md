@@ -103,7 +103,7 @@ A publish waits for the connection to recover, whether or not the process has co
 | `InitialConnectionTimeout` passes before the first connection | `PublishFailedException` | `Unreachable` |
 | The caller's `CancellationToken` is cancelled | `OperationCanceledException` | Same as for the TTL |
 
-Events have no TTL by default: without a TTL or a `CancellationToken`, a publish waits until the broker is back. A request waits for its reply at most for its TTL, or 5 seconds when it has no positive TTL; a reply that does not arrive in time also ends with `OperationCanceledException`, without an inner `PublishFailedException`.
+Events have no TTL by default: without a TTL or a `CancellationToken`, a publish waits until the broker is back. A request waits for its reply at most for its TTL, or, without a positive TTL, until its `CancellationToken` is cancelled (at most 5 seconds when it has none); a reply that does not arrive in time also ends with `OperationCanceledException`, without an inner `PublishFailedException`.
 
 Handle these exceptions in publishing code to implement application-level fallback logic:
 

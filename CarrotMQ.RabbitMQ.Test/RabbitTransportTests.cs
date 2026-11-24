@@ -112,9 +112,10 @@ public class RabbitTransportTests
     private static async Task AssertCancelledAsync(Task send, PublishFailureReason reason)
     {
         await Wait.UntilAsync(() => send.IsCompleted, "the cancelled send completes while no channel is available").ConfigureAwait(false);
-        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => send).ConfigureAwait(false);
-        Assert.AreEqual(reason, exception.Reason);
-        Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
+        var exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => send).ConfigureAwait(false);
+        Assert.IsTrue(exception.CancellationToken.IsCancellationRequested, "The exception carries the cancelled token.");
+        var failure = Assert.IsInstanceOfType<PublishFailedException>(exception.InnerException);
+        Assert.AreEqual(reason, failure.Reason);
     }
 
     private static CarrotMessage CreateMessage(bool publisherConfirm)

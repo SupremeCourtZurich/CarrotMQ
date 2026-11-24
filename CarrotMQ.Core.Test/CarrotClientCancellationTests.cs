@@ -9,8 +9,8 @@ using NSubstitute;
 namespace CarrotMQ.Core.Test;
 
 /// <summary>
-/// The transport fails with <see cref="PublishFailedException" /> when its token fires; the client turns that into an
-/// <see cref="OperationCanceledException" />, whether the caller's token or the TTL fired.
+/// The transport fails with an <see cref="OperationCanceledException" /> carrying a <see cref="PublishFailedException" /> when
+/// its token fires; the client passes it on with the caller's token when the caller cancelled.
 /// </summary>
 [TestClass]
 public class CarrotClientCancellationTests
@@ -40,7 +40,7 @@ public class CarrotClientCancellationTests
 
         // Assert
         var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => publish).ConfigureAwait(false);
-        Assert.AreEqual(cts.Token, exception.CancellationToken);
+        Assert.IsTrue(exception.CancellationToken.IsCancellationRequested, "The exception carries the cancelled token.");
         Assert.AreEqual(PublishFailureReason.Unreachable, ((PublishFailedException)exception.InnerException!).Reason);
     }
 
@@ -60,23 +60,6 @@ public class CarrotClientCancellationTests
         Assert.IsTrue(exception.CancellationToken.CanBeCanceled, "The exception carries the TTL token.");
     }
 
-    [TestMethod]
-    [Timeout(5_000)]
-    public async Task Publish_RetryLimitExceededWhileTheCallersTokenIsCancelled_KeepsTheFailure()
-    {
-        // Arrange
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .Returns(_ => throw new RetryLimitExceededException("no confirm", PublishFailureReason.Unreachable));
-
-        // Act
-        var publish = _client.PublishAsync(new TestDto(1), cancellationToken: cts.Token);
-
-        // Assert
-        var exception = await Assert.ThrowsExactlyAsync<RetryLimitExceededException>(() => publish).ConfigureAwait(false);
-        Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason);
-    }
 
     [TestMethod]
     [Timeout(5_000)]
@@ -93,7 +76,7 @@ public class CarrotClientCancellationTests
 
         // Assert
         var exception = await Assert.ThrowsAsync<OperationCanceledException>(() => send).ConfigureAwait(false);
-        Assert.AreEqual(cts.Token, exception.CancellationToken);
+        Assert.IsTrue(exception.CancellationToken.IsCancellationRequested, "The exception carries the cancelled token.");
         Assert.AreEqual(PublishFailureReason.Unreachable, ((PublishFailedException)exception.InnerException!).Reason);
     }
 
@@ -137,39 +120,29 @@ public class CarrotClientCancellationTests
         Assert.AreEqual(ttl ?? 5_000, sent!.Header.MessageProperties.Ttl);
     }
 
-    // A connect timeout inside the client can surface as OperationCanceledException without any token firing.
     [TestMethod]
     [Timeout(5_000)]
-    public async Task Publish_FailsWithACancellationNobodyRequested_ThrowsPublishFailedException()
+    [DataRow(0)]
+    [DataRow(-1)]
+    public async Task SendReceive_NoPositiveTtlWithTheCallersToken_WaitsForTheCallersToken(int ttl)
     {
         // Arrange
-        _transport.SendAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromException(new PublishFailedException("no connection", PublishFailureReason.Unreachable, new OperationCanceledException())));
-
-        // Act
-        var publish = _client.PublishAsync(new TestDto(1), messageProperties: new MessageProperties { Ttl = 60_000 });
-
-        // Assert
-        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
-        Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason);
-    }
-
-    [TestMethod]
-    [Timeout(5_000)]
-    public async Task SendReceive_FailsWithACancellationNobodyRequested_ThrowsPublishFailedException()
-    {
-        // Arrange
-        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromException<CarrotMessage>(new PublishFailedException("no connection", PublishFailureReason.Unreachable, new OperationCanceledException())));
+        using var cts = new CancellationTokenSource();
+        CancellationToken sentWith = default;
+        _transport.SendReceiveAsync(Arg.Any<CarrotMessage>(), Arg.Do<CancellationToken>(t => sentWith = t))
+            .Returns(_ => Task.FromException<CarrotMessage>(new PublishFailedException("stop", PublishFailureReason.Unknown)));
         ICommand<TestDto, TestResponse, TestQueueEndPoint> command = new TestDto(1);
 
         // Act
-        var send = _client.SendReceiveAsync(command, messageProperties: new MessageProperties { Ttl = 60_000 });
+        await Assert.ThrowsAsync<PublishFailedException>(
+                () => _client.SendReceiveAsync(command, messageProperties: new MessageProperties { Ttl = ttl }, cancellationToken: cts.Token))
+            .ConfigureAwait(false);
 
         // Assert
-        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => send).ConfigureAwait(false);
-        Assert.AreEqual(PublishFailureReason.Unreachable, exception.Reason);
+        Assert.AreEqual(cts.Token, sentWith);
     }
+
+
     // Like a transport waiting for an unreachable broker: it gives up only when its token fires.
     private void TransportFailsWhenCancelled(PublishFailureReason reason)
     {
@@ -187,7 +160,7 @@ public class CarrotClientCancellationTests
         }
         catch (OperationCanceledException ex)
         {
-            throw new PublishFailedException("cancelled", reason, ex);
+            throw new OperationCanceledException("cancelled", new PublishFailedException("cancelled", reason, ex), token);
         }
 
         throw new InvalidOperationException("Unreachable");

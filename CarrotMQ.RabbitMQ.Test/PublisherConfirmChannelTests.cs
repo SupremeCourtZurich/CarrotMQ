@@ -182,7 +182,7 @@ public class PublisherConfirmChannelTests
 
         // 2) Cancel publish
         tokenSource.Cancel();
-        await Assert.ThrowsExactlyAsync<PublishFailedException>(() => task).ConfigureAwait(false);
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => task).ConfigureAwait(false);
 
         // Nothing should be republished
         await RepublishAsync(1).ConfigureAwait(false);
@@ -203,13 +203,16 @@ public class PublisherConfirmChannelTests
 
         // 3) Cancel first 3 publishes
         tokenSource.Cancel();
-        await Assert.ThrowsExactlyAsync<PublishFailedException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
+        await Assert.ThrowsAsync<OperationCanceledException>(() => Task.WhenAll(tasks)).ConfigureAwait(false);
 
         // Republish last message
         await RepublishAsync(1).ConfigureAwait(false);
 
         // verify
-        Assert.IsTrue(tasks.All(t => t.Exception?.InnerException is PublishFailedException { InnerException: OperationCanceledException }));
+        foreach (var task in tasks)
+        {
+            await AssertCancelledAsync(task, PublishFailureReason.Unknown).ConfigureAwait(false);
+        }
         await VerifyBasicPublishAsync(5).ConfigureAwait(false);
     }
 
@@ -457,9 +460,10 @@ public class PublisherConfirmChannelTests
 
     private static async Task AssertCancelledAsync(Task publish, PublishFailureReason reason)
     {
-        var exception = await Assert.ThrowsExactlyAsync<PublishFailedException>(() => publish).ConfigureAwait(false);
-        Assert.AreEqual(reason, exception.Reason);
-        Assert.IsInstanceOfType<OperationCanceledException>(exception.InnerException);
+        var exception = await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => publish).ConfigureAwait(false);
+        Assert.IsTrue(exception.CancellationToken.IsCancellationRequested, "The exception carries the cancelled token.");
+        var failure = Assert.IsInstanceOfType<PublishFailedException>(exception.InnerException);
+        Assert.AreEqual(reason, failure.Reason);
     }
 
     private static Task WaitForCallsAsync<T>(T substitute, string methodName, int count)

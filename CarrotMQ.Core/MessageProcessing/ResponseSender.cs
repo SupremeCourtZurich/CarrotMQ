@@ -29,7 +29,7 @@ public sealed class ResponseSender : IResponseSender
     }
 
     /// <inheritdoc />
-    public async Task TrySendResponseAsync(MiddlewareContext middlewareContext)
+    public async Task TrySendResponseAsync(MiddlewareContext middlewareContext, CancellationToken cancellationToken)
     {
         var requestMessage = middlewareContext.Message;
         var result = middlewareContext.HandlerResult;
@@ -40,7 +40,7 @@ public sealed class ResponseSender : IResponseSender
         {
             if (!middlewareContext.ResponseSent)
             {
-                await SendResponse(requestMessage, result).ConfigureAwait(false);
+                await SendResponse(requestMessage, result, cancellationToken).ConfigureAwait(false);
             }
         }
         else if (result is ErrorResult)
@@ -49,20 +49,17 @@ public sealed class ResponseSender : IResponseSender
         }
     }
 
-    private async Task SendResponse(CarrotMessage requestMessage, IHandlerResult result)
+    private async Task SendResponse(CarrotMessage requestMessage, IHandlerResult result, CancellationToken cancellationToken)
     {
         var responseMessage = CreateResponseMessage(requestMessage, result);
 
-        // Once the request's TTL has passed, nobody waits for its response any more.
-        var ttl = responseMessage.Header.MessageProperties.Ttl;
-        using var ttlSource = ttl > 0 ? new CancellationTokenSource(ttl.Value) : null;
         try
         {
-            await _transport.SendAsync(responseMessage, ttlSource?.Token ?? CancellationToken.None).ConfigureAwait(false);
+            await _transport.SendAsync(responseMessage, cancellationToken).ConfigureAwait(false);
         }
-        catch (PublishFailedException ex) when (ex.InnerException is OperationCanceledException && ttlSource is { IsCancellationRequested: true })
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
         {
-            _logger.LogWarning(ex, "Response {CalledMethod} dropped: the request's TTL passed before it was published", requestMessage.Header.CalledMethod);
+            _logger.LogWarning(ex, "Response {CalledMethod} dropped: its deadline passed before it was published", requestMessage.Header.CalledMethod);
 
             return;
         }

@@ -96,14 +96,15 @@ public interface ICarrotClient
     /// <param name="messageProperties">
     /// The optional MessageProperties.
     /// If not specified <see cref="MessageProperties.Default" /> is used. A <see cref="MessageProperties.Ttl" /> of null is set to
-    /// 5000; with a TTL of zero or less the header keeps it, but the wait for the reply still ends after 5000 ms.
+    /// 5000; a TTL of zero or less is kept in the header, and the wait for the reply then ends only through
+    /// <paramref name="cancellationToken" />, or after 5000 ms when that token cannot be cancelled.
     /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the command.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided command has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive) expired first. When the publish itself did not complete, the
+    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive and no cancellable token is passed) expired first. When the publish itself did not complete, the
     /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
@@ -137,14 +138,15 @@ public interface ICarrotClient
     /// <param name="messageProperties">
     /// The optional MessageProperties.
     /// If not specified <see cref="MessageProperties.Default" /> is used. A <see cref="MessageProperties.Ttl" /> of null is set to
-    /// 5000; with a TTL of zero or less the header keeps it, but the wait for the reply still ends after 5000 ms.
+    /// 5000; a TTL of zero or less is kept in the header, and the wait for the reply then ends only through
+    /// <paramref name="cancellationToken" />, or after 5000 ms when that token cannot be cancelled.
     /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the query.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided query has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
     /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
-    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive) expired first. When the publish itself did not complete, the
+    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive and no cancellable token is passed) expired first. When the publish itself did not complete, the
     /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
     /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>

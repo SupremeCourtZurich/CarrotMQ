@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using CarrotMQ.Core.Protocol;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -56,12 +57,11 @@ internal static class PublishFailure
         return !channelOpen && reason == PublishFailureReason.Unknown ? PublishFailureReason.Unreachable : reason;
     }
 
-    public static PublishFailedException Cancelled(CarrotHeader header, PublishFailureReason reason, OperationCanceledException cancellation)
+    public static OperationCanceledException Cancelled(CarrotHeader header, PublishFailureReason reason, OperationCanceledException cancellation, CancellationToken token)
     {
-        return new PublishFailedException(
-            $"Publish to exchange '{header.Exchange}' with routing key '{header.RoutingKey}' was cancelled before it completed ({reason}).",
-            reason,
-            cancellation);
+        var message = $"Publish to exchange '{header.Exchange}' with routing key '{header.RoutingKey}' was cancelled before it completed ({reason}).";
+
+        return new OperationCanceledException(message, new PublishFailedException(message, reason, cancellation), token);
     }
 
     /// <summary>
