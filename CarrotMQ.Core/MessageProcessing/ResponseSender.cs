@@ -29,7 +29,7 @@ public sealed class ResponseSender : IResponseSender
     }
 
     /// <inheritdoc />
-    public async Task TrySendResponseAsync(MiddlewareContext middlewareContext)
+    public async Task TrySendResponseAsync(MiddlewareContext middlewareContext, CancellationToken cancellationToken)
     {
         var requestMessage = middlewareContext.Message;
         var result = middlewareContext.HandlerResult;
@@ -40,7 +40,7 @@ public sealed class ResponseSender : IResponseSender
         {
             if (!middlewareContext.ResponseSent)
             {
-                await SendResponse(requestMessage, result).ConfigureAwait(false);
+                await SendResponse(requestMessage, result, cancellationToken).ConfigureAwait(false);
             }
         }
         else if (result is ErrorResult)
@@ -49,10 +49,20 @@ public sealed class ResponseSender : IResponseSender
         }
     }
 
-    private async Task SendResponse(CarrotMessage requestMessage, IHandlerResult result)
+    private async Task SendResponse(CarrotMessage requestMessage, IHandlerResult result, CancellationToken cancellationToken)
     {
         var responseMessage = CreateResponseMessage(requestMessage, result);
-        await _transport.SendAsync(responseMessage, CancellationToken.None).ConfigureAwait(false);
+
+        try
+        {
+            await _transport.SendAsync(responseMessage, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException ex) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Response {CalledMethod} dropped: its deadline passed before it was published", requestMessage.Header.CalledMethod);
+
+            return;
+        }
 
         _logger.LogDebug(
             "Published response {CalledMethod}, StatusCode:{StatusCode}",

@@ -77,7 +77,9 @@ Sets the maximum time a handler is allowed to run before processing is cancelled
 - Whether the message is redelivered or dead-lettered depends on your queue's dead-letter configuration.
 
 > [!NOTE]
-> This timeout is separate from the per-message `MessageProperties.Ttl`. `Ttl` is an AMQP-level setting that controls two things: (1) the maximum time a message may wait in the queue before RabbitMQ expires it, and (2) the publisher-side timeout for `SendReceiveAsync` calls. `MessageProcessingTimeout` is a consumer-level setting that controls how long the handler is allowed to run **after** the message has already been delivered — it is enforced independently of any TTL on the message.
+> This timeout is separate from the per-message `MessageProperties.Ttl`. `Ttl` controls (1) the maximum time a message may wait in the queue before RabbitMQ expires it, (2) the publisher-side timeout, and (3) a deadline counted from the message's arrival at the consumer that cancels the handler and bounds the publish of its response. `MessageProcessingTimeout` is a consumer-level setting that controls how long the handler is allowed to run **after** the message has already been delivered — it is enforced independently of any TTL on the message.
+>
+> Without a positive `Ttl`, the response must be published within 5 seconds after the handler ended. A response not published within its bound is dropped with a warning, and a handler cancelled by the TTL sends no response.
 
 ```csharp
 .WithMessageProcessingTimeout(TimeSpan.FromSeconds(30))

@@ -28,13 +28,18 @@ public interface ICarrotClient
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided event has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task PublishAsync<TEvent>(
         ICustomRoutingEvent<TEvent> @event,
@@ -57,13 +62,18 @@ public interface ICarrotClient
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided event has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task PublishAsync<TEvent, TExchangeEndPoint>(
         IEvent<TEvent, TExchangeEndPoint> @event,
@@ -85,19 +95,26 @@ public interface ICarrotClient
     /// <param name="context">The optional context for the operation.</param>
     /// <param name="messageProperties">
     /// The optional MessageProperties.
-    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
+    /// If not specified <see cref="MessageProperties.Default" /> is used. A <see cref="MessageProperties.Ttl" /> of null is set to
+    /// 5000; a TTL of zero or less is kept in the header, and the wait for the reply then ends only through
+    /// <paramref name="cancellationToken" />, or after 5000 ms when that token cannot be cancelled.
     /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the command.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided command has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive and no cancellable token is passed) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task<CarrotResponse<TCommand, TResponse>> SendReceiveAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
@@ -120,19 +137,26 @@ public interface ICarrotClient
     /// <param name="context">The optional context for the operation.</param>
     /// <param name="messageProperties">
     /// The optional MessageProperties.
-    /// If not specified <see cref="MessageProperties.Default" /> is used and TTL set to 5000.
+    /// If not specified <see cref="MessageProperties.Default" /> is used. A <see cref="MessageProperties.Ttl" /> of null is set to
+    /// 5000; a TTL of zero or less is kept in the header, and the wait for the reply then ends only through
+    /// <paramref name="cancellationToken" />, or after 5000 ms when that token cannot be cancelled.
     /// </param>
     /// <param name="cancellationToken">The cancellation token for the operation.</param>
     /// <returns>The reply to the query.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided query has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />, or 5000 ms when it is not positive and no cancellable token is passed) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task<CarrotResponse<TQuery, TResponse>> SendReceiveAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> query,
@@ -161,13 +185,18 @@ public interface ICarrotClient
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided command has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task SendAsync<TCommand, TResponse, TEndPointDefinition>(
         ICommand<TCommand, TResponse, TEndPointDefinition> command,
@@ -198,13 +227,18 @@ public interface ICarrotClient
     /// <returns>A task representing the asynchronous operation.</returns>
     /// <exception cref="ArgumentException">Thrown if the provided query has invalid properties.</exception>
     /// <exception cref="OperationCanceledException">
-    /// Thrown if the message could not published in time (based on message ttl in
-    /// <paramref name="context" />"/> <see cref="MessageProperties.Ttl" />) or the operation has been canceled by
-    /// <paramref name="cancellationToken" />.
+    /// Thrown if the operation has been canceled by <paramref name="cancellationToken" />, or the message's TTL
+    /// (<see cref="MessageProperties.Ttl" />) expired first. When the publish itself did not complete, the
+    /// <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown if no connection to the broker could be established within the initial connection timeout, or, without
+    /// publisher confirms, the channel was closed while the message was being sent.
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
     /// </exception>
     /// <exception cref="RetryLimitExceededException">
-    /// Thrown if the message could not published within the defined amount of
-    /// retries
+    /// Thrown if the message could not be confirmed within the defined number of retries.
     /// </exception>
     Task SendAsync<TQuery, TResponse, TEndPointDefinition>(
         IQuery<TQuery, TResponse, TEndPointDefinition> query,

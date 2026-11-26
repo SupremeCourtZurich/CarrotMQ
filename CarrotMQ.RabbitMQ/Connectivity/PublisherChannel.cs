@@ -6,6 +6,7 @@ using CarrotMQ.Core.Protocol;
 using CarrotMQ.RabbitMQ.Serialization;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
+using RabbitMQ.Client.Exceptions;
 
 namespace CarrotMQ.RabbitMQ.Connectivity;
 
@@ -24,9 +25,26 @@ internal class PublisherChannel : CarrotChannel, IPublisherChannel
     /// <inheritdoc />
     public virtual async Task PublishAsync(CarrotMessage message, CancellationToken token)
     {
-        using var scope = await ChannelLock.LockAsync().ConfigureAwait(false);
-        var basicProperties = CreateBasicProperties(message.Header);
+        try
+        {
+            using (await ChannelLock.LockAsync(token).ConfigureAwait(false))
+            {
+                await PublishOnOpenChannelAsync(message, token).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException ex) when (token.IsCancellationRequested)
+        {
+            throw PublishFailure.Cancelled(message.Header, PublishFailure.ReasonAtCancellation(Connection, IsOpen, PublishFailureReason.Unknown), ex, token);
+        }
+        catch (AlreadyClosedException ex)
+        {
+            throw PublishFailure.Closed(message.Header, Connection, ex);
+        }
+    }
 
+    private async Task PublishOnOpenChannelAsync(CarrotMessage message, CancellationToken token)
+    {
+        var basicProperties = CreateBasicProperties(message.Header);
         string payload = ProtocolSerializer.Serialize(message, basicProperties);
 
         await Channel!.BasicPublishAsync(

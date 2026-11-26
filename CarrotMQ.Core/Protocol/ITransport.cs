@@ -19,6 +19,16 @@ public interface ITransport : IDisposable, IAsyncDisposable
     /// <param name="message">The CarrotMQ message to be sent.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A task representing the asynchronous send operation.</returns>
+    /// <exception cref="OperationCanceledException">
+    /// Thrown when <paramref name="cancellationToken" /> is cancelled before the message was sent or, with publisher
+    /// confirms, confirmed. The <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown when the message could not be published, for example when no connection was established within the initial
+    /// connection timeout (<see cref="PublishFailureReason.Unreachable" />) or the retry limit was reached
+    /// (<see cref="RetryLimitExceededException" />).
+    /// </exception>
     Task SendAsync(CarrotMessage message, CancellationToken cancellationToken);
 
     /// <summary>
@@ -27,5 +37,13 @@ public interface ITransport : IDisposable, IAsyncDisposable
     /// <param name="message">The CarrotMQ message to be sent.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The received CarrotMQ message as a response.</returns>
+    /// <exception cref="OperationCanceledException">
+    /// Thrown when <paramref name="cancellationToken" /> is cancelled before the response arrived. When the message itself
+    /// was not published, the <see cref="Exception.InnerException" /> is a <see cref="PublishFailedException" /> whose
+    /// <see cref="PublishFailedException.Reason" /> tells whether the broker was unreachable.
+    /// </exception>
+    /// <exception cref="PublishFailedException">
+    /// Thrown when the message could not be published, as for <see cref="SendAsync" />.
+    /// </exception>
     Task<CarrotMessage> SendReceiveAsync(CarrotMessage message, CancellationToken cancellationToken);
 }

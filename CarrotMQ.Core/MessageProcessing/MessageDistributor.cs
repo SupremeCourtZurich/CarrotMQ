@@ -18,6 +18,8 @@ namespace CarrotMQ.Core.MessageProcessing;
 /// </summary>
 internal sealed class MessageDistributor : IMessageDistributor
 {
+    private const int DefaultResponseTimeoutInMs = 5_000;
+
     private readonly IDependencyInjector _dependencyInjector;
     private readonly IDictionary<string, HandlerProcessorBase> _handlerRegistry;
 
@@ -51,16 +53,18 @@ internal sealed class MessageDistributor : IMessageDistributor
 
         MiddlewareContext? middlewareContext = null;
 
+        // The TTL counts from the request's arrival and bounds both the handler and its response.
+        var ttl = carrotMessage.Header.MessageProperties.Ttl;
+        using var ttlSource = ttl > 0 ? new CancellationTokenSource(ttl.Value) : null;
+
         try
         {
             var scopedDependencyInjector = _dependencyInjector.CreateAsyncScope();
             await using var _ = scopedDependencyInjector.ConfigureAwait(false);
 
-            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            if (carrotMessage.Header.MessageProperties.Ttl > 0)
-            {
-                cts.CancelAfter((int)carrotMessage.Header.MessageProperties.Ttl);
-            }
+            using var cts = ttlSource is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ttlSource.Token);
 
             middlewareContext = CreateMiddlewareContext(carrotMessage, handlerProcessor!, cts.Token);
 
@@ -87,7 +91,9 @@ internal sealed class MessageDistributor : IMessageDistributor
         {
             if (middlewareContext is not null)
             {
-                await _responseSender.TrySendResponseAsync(middlewareContext).ConfigureAwait(false);
+                // Without a positive TTL the response gets a fixed bound, starting once the handler has ended.
+                using var responseTimeout = ttlSource is null ? new CancellationTokenSource(DefaultResponseTimeoutInMs) : null;
+                await _responseSender.TrySendResponseAsync(middlewareContext, ttlSource?.Token ?? responseTimeout!.Token).ConfigureAwait(false);
             }
         }
 

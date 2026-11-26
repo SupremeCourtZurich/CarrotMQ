@@ -5,6 +5,23 @@ namespace CarrotMQ.Core.Test.Common;
 [TestClass]
 public class AsyncLockTests
 {
+    [TestMethod]
+    [Timeout(5_000)]
+    public async Task LockAsync_TokenCancelledWhileTheLockIsHeld_ThrowsOperationCanceledException()
+    {
+        // Arrange
+        var asyncLock = new AsyncLock();
+        using var held = await asyncLock.LockAsync().ConfigureAwait(false);
+        using var cts = new CancellationTokenSource();
+        var waiting = asyncLock.LockAsync(cts.Token);
+
+        // Act
+        cts.Cancel();
+
+        // Assert
+        await Assert.ThrowsAsync<OperationCanceledException>(() => waiting).ConfigureAwait(false);
+    }
+
 #if NET
     [TestMethod]
     public async Task AsyncLock_AcquiresAndReleasesLock_Parallel()

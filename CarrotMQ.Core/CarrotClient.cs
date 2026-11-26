@@ -17,6 +17,7 @@ namespace CarrotMQ.Core;
 /// </summary>
 public sealed class CarrotClient : ICarrotClient
 {
+    private const int DefaultRequestTtlInMs = 5_000;
     private readonly ICarrotMessageBuilder _messageBuilder;
     private readonly ICarrotSerializer _serializer;
     private readonly ITransport _transport;
@@ -142,15 +143,19 @@ public sealed class CarrotClient : ICarrotClient
         if (message.Header.MessageProperties.Ttl is null)
         {
             MessageProperties msgProps = message.Header.MessageProperties;
-            msgProps.Ttl = 5_000;
+            msgProps.Ttl = DefaultRequestTtlInMs;
             message.Header.MessageProperties = msgProps;
         }
 
+        // Without a positive TTL the caller's token bounds the wait; without a cancellable token the default TTL does.
+        var timeout = message.Header.MessageProperties.Ttl > 0 ? message.Header.MessageProperties.Ttl
+            : cancellationToken.CanBeCanceled ? null : DefaultRequestTtlInMs;
+
         CarrotMessage responseMessage;
-        if (message.Header.MessageProperties.Ttl > 0)
+        if (timeout > 0)
         {
             using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            linkedTokenSource.CancelAfter((int)message.Header.MessageProperties.Ttl);
+            linkedTokenSource.CancelAfter(timeout.Value);
             responseMessage = await _transport.SendReceiveAsync(message, linkedTokenSource.Token).ConfigureAwait(false);
         }
         else
